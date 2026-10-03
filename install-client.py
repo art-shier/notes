@@ -107,7 +107,9 @@ def install(args):
                 existed=target.exists()
                 previous_command=launcher.read_bytes() if launcher.exists() else None
                 command_backup=stage/'command-old'
-                if previous_command is not None: command_backup.write_bytes(previous_command)
+                if previous_command is not None:
+                    command_backup.write_bytes(previous_command)
+                    command_backup.chmod(launcher.stat().st_mode&0o777)
                 try:
                     if existed: target.rename(old)
                     new.rename(target)

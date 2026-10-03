@@ -40,6 +40,16 @@ with tempfile.TemporaryDirectory(prefix='notes-client-test-') as temporary:
         else:raise AssertionError('Fixture interruption was ignored')
     assert target.is_dir(),'Interrupted update must preserve the previously installed Skill'
     assert launcher.read_bytes()==original_command and (target/'SKILL.md').read_bytes()==original_skill
+    replace=module.os.replace;original_mode=launcher.stat().st_mode&0o777
+    def late_interruption(source,destination):
+        replace(source,destination)
+        if Path(source).name.startswith('.shiji-command-'):raise KeyboardInterrupt()
+    with patch.object(module,'launcher_bytes',return_value=original_command+b'\n'),patch.object(module.os,'replace',late_interruption):
+        try:module.install(options)
+        except KeyboardInterrupt:pass
+        else:raise AssertionError('Late publication interruption was ignored')
+    assert launcher.read_bytes()==original_command and (target/'SKILL.md').read_bytes()==original_skill
+    if os.name!='nt':assert launcher.stat().st_mode&0o777==original_mode,'Rollback must preserve command execute permissions'
     pinned='a'*40;urls=[]
     def download(url):
         urls.append(url)
