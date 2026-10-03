@@ -96,4 +96,6 @@ shiji serve
 
 ## 6. 本轮证据
 
-Go迁移验证记录见 [Go迁移实施计划](notes-go-migration-plan.md)，旧阶段记录保留在 [部署与恢复阶段方案](notes-operations-phase-plan.md)。本地使用真实迁移的隔离库，通过独立Go CLI进程备份/校验/恢复，再启动恢复库API；旧密码、Token、图文与历史均可继续使用。主预览已切换Go，未创建测试账号。正式服务器尚待SSH连接、系统/Compose状态及域名信息。
+Go迁移验证记录见 [Go迁移实施计划](notes-go-migration-plan.md)，旧阶段记录保留在 [部署与恢复阶段方案](notes-operations-phase-plan.md)。本地使用真实迁移的隔离库，通过独立Go CLI进程备份/校验/恢复，再启动恢复库API；旧密码、Token、图文与历史均可继续使用。主预览已切换Go，未创建测试账号。
+
+[Linux CI 已通过](https://github.com/art-shier/notes/actions/runs/37112169790)：生产 Docker 镜像构建、真实 PostgreSQL16 的图文/标签/版本/历史/导出，以及原生数据库备份恢复。恢复后的密码、Token和图片保留，旧网页会话失效。自动安装系统依赖的控制流程使用模拟命令回归；真实域名证书、服务器权限/端口和容量仍需在目标服务器验收。

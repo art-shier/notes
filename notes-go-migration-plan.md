@@ -41,4 +41,12 @@
 - 原Python当前schema库迁入Go：旧Argon2密码、会话、Token、块ID和含HTML字符的幂等请求重放通过；Go写入历史后，经Go CLI备份/恢复，密码/Token/图片保留，旧会话失效。另成功恢复既有Python双用户v1备份。
 - 独立审查发现并修复：大中文JSON传输上限不兼容、并发图片解码内存风险、健康脚本遗留Python依赖。新增大正文与并发阻塞读取回归验证修复。
 - 主库停机备份至本地work/go-main-before-switch，并校验后恢复至notes-server-go/data；原Python数据保留。主Web5173/API8000已使用Go，主库用户数仍0。隔离8001/5174测试服务已停止，临时明文测试账号文件已删除。
-- 真实PostgreSQL16、Docker镜像/Compose、DNS/HTTPS及生产容量压测未执行，继续按部署指南在目标服务器验收。没有公开注册、定时备份或正式上线。
+- 初始本地迁移阶段尚未执行真实 PostgreSQL16、Docker镜像/Compose、DNS/HTTPS及生产容量压测；后续 CI 验证见下方。没有公开注册、定时备份或正式上线。
+
+## 一键部署与 Linux CI 补充验收（2026-10-03）
+
+- Git 仓库已初始化并推送到公开的 https://github.com/art-shier/notes；运行数据、密码配置及旧 Python 后端不进入版本库。
+- [Linux CI](https://github.com/art-shier/notes/actions/runs/37112169790) 已通过 Go 全套测试和 race/vet、无 CGO 构建、Web 7 项测试与构建、安装脚本语法与回归。
+- 生产 Docker 镜像构建成功；Compose 中以真实 PostgreSQL16 完成账户、图片、标签、CAS 冲突、幂等、历史恢复和 ZIP 完整性验证。原生 pg_dump/pg_restore 恢复后密码、Token、图片仍可用，旧会话失效。
+- install.sh 支持公开下载、Linux 依赖安装、随机数据库密码、HTTPS 就绪检查和首次管理员邀请；重复执行保留配置和数据。审查发现的 Ubuntu 已有 Docker 缺 Compose 软件包选择问题已补回归并修复。
+- 实际域名的 Caddy 证书、服务器环境、生产容量和异机备份仍需在目标服务器验收。

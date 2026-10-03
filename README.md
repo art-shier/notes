@@ -58,7 +58,7 @@ bash ops/check.sh https://notes.example.com
 - [Agent Skill](notes-skill/shiji-notes/SKILL.md)：Python标准库客户端，服务端运行不依赖 Python。
 - [技术方案](notes-technical-plan.md)与[Go迁移记录](notes-go-migration-plan.md)。
 
-一键脚本有模拟命令回归，CI验证Go/Web及脚本。Docker、域名证书和容量还需在目标服务器实际验收；HTTP安全校验不会跳过TLS证书检查。
+一键脚本有模拟命令回归；[CI](https://github.com/art-shier/notes/actions) 验证 Go 测试/竞态/vet、Web 测试/构建、安装脚本，以及真实 Docker + PostgreSQL 16 的 API 和完整备份恢复。[首轮验证已通过](https://github.com/art-shier/notes/actions/runs/37112169790)。域名证书、服务器环境和生产容量仍需在目标服务器验收；HTTPS 校验不会跳过 TLS 证书检查。
 
 私有仓库副本可通过API下载脚本并使用临时Token克隆（Token只用于认证，不写入Git远程地址或配置）：
 
