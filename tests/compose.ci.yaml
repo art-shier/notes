@@ -1,0 +1,8 @@
+services:
+  app:
+    image: shiji-ci
+    environment:
+      APP_ORIGIN: http://127.0.0.1:${TEST_PORT:-18000}
+      COOKIE_SECURE: 'false'
+    ports:
+      - '127.0.0.1:${TEST_PORT:-18000}:8000'

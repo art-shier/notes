@@ -1,0 +1,60 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: notes-server-go/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://notes:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/notes
+      APP_ORIGIN: https://${DOMAIN:?Set DOMAIN}
+      COOKIE_SECURE: 'true'
+      ATTACHMENTS_DIR: /data/attachments
+      EXPORTS_DIR: /data/exports
+      NOTE_HISTORY_LIMIT: ${NOTE_HISTORY_LIMIT:-200}
+      EXPORT_LIMIT_BYTES: ${EXPORT_LIMIT_BYTES:-2147483648}
+    volumes:
+      - attachments:/data/attachments
+      - exports:/data/exports
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, shiji, health]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: notes
+      POSTGRES_USER: notes
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U notes -d notes]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  attachments:
+  exports:
+  database:
+  caddy_data:
+  caddy_config:

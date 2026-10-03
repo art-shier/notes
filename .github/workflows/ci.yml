@@ -1,0 +1,45 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: notes-server-go/go.mod
+          cache-dependency-path: notes-server-go/go.sum
+      - name: Go test, race, vet and build
+        working-directory: notes-server-go
+        run: |
+          go test -race ./...
+          go vet ./...
+          CGO_ENABLED=0 go build ./cmd/shiji
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: notes-web/package-lock.json
+      - name: Web tests and build
+        working-directory: notes-web
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Installer syntax and regression
+        run: |
+          bash -n install.sh notes-server-go/ops/*.sh
+          python3 tests/deploy_test.py
+  docker-postgres:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production Docker image
+        run: docker build -f notes-server-go/Dockerfile -t shiji-ci .
+      - name: PostgreSQL 16 API and backup restore smoke
+        run: python3 tests/pg_smoke.py
