@@ -1,5 +1,7 @@
 # 部署脚本测试
 
+`python3 tests/client_install_test.py` 使用临时目录安装真实 CLI/Skill，验证带空格路径下的命令帮助、重复安装，以及自定义文件、无关命令、下载源缺失和符号链接保护。CI分别在 Linux 和 Windows 执行，并在 Windows 验证 PowerShell入口；不会配置访问Token或修改真实用户的Skill目录。
+
 `python3 tests/config_hub_start_test.py` 使用真实 jq 和临时目录执行启动脚本，模拟 ConfigHub/容器外部边界：特殊字符URL编码、无关秘密不导出、环境变量覆盖隔离、重复拉取、密码更新、失败保留旧配置、目标锁定及并发/原部署保护。Linux需要jq；Windows开发回归使用work中的官方jq工具，生产不依赖Python。
 
 `python3 tests/deploy_test.py` 使用临时目录和模拟 Git/Docker/curl 验证安装控制流程，不连接真实服务器，不安装系统依赖、不删除真实 Docker 数据。生产部署无需 Python。

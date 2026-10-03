@@ -33,10 +33,28 @@ jobs:
           npm run build
       - name: Installer syntax and regression
         run: |
-          for script in install.sh notes-server-go/ops/*.sh; do bash -n "$script"; done
+          for script in install.sh install-client.sh notes-server-go/ops/*.sh; do bash -n "$script"; done
           if ! command -v jq >/dev/null; then sudo apt-get update && sudo apt-get install -y jq; fi
           python3 tests/deploy_test.py
           python3 tests/config_hub_start_test.py
+          python3 tests/client_install_test.py
+  client-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: CLI and Skill installer regression
+        run: python tests/client_install_test.py
+      - name: PowerShell installation entry point
+        shell: pwsh
+        run: |
+          $skillRoot = Join-Path $env:RUNNER_TEMP 'notes-client-skills'
+          $commandRoot = Join-Path $env:RUNNER_TEMP 'notes-client-bin'
+          ./install-client.ps1 -SourceDir $pwd.Path -SkillsDir $skillRoot -BinDir $commandRoot -Python (Get-Command python).Source -NoPathUpdate
+          & (Join-Path $commandRoot 'shiji-notes.cmd') --help
+          if ($LASTEXITCODE -ne 0) { throw 'Installed CLI help failed' }
   docker-postgres:
     runs-on: ubuntu-latest
     steps:

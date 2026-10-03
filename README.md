@@ -78,6 +78,35 @@ bash ops/check.sh https://notes.example.com
 
 ## 本地开发与 Agent
 
+### 一键安装笔记 CLI + Skill
+
+安装在 Agent 所在机器，需要 Python 3.10+。CLI 不依赖 Docker、Git或第三方 Python 库。
+
+Linux/macOS：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install-client.sh | bash
+```
+
+Windows PowerShell：
+
+```powershell
+irm https://raw.githubusercontent.com/art-shier/notes/main/install-client.ps1 | iex
+```
+
+默认将 Skill 安装到 `~/.agents/skills/shiji-notes`，命令安装到 `~/.local/bin`，使用 `shiji-notes --help` 验证。Windows脚本会将命令目录加入用户和当前终端 PATH；其他已打开的终端需要重开。Linux/macOS 若当前 PATH 没有该目录，执行 `export PATH="$HOME/.local/bin:$PATH"`，并加入所用 shell 的启动文件。重启 Agent 以加载新 Skill。
+
+其他 Agent 可指定自己的 Skill 目录：Linux/macOS 在上述命令最后的 `bash` 后追加 `-s -- --skills-dir /你的/skills目录`；Windows下载脚本后使用 `./install-client.ps1 -SkillsDir 'C:\你的\skills目录'`。`--bin-dir` / `-BinDir` 可以自定义命令目录。已有源码也可直接运行 `python install-client.py --source-dir .`。
+
+下载时先解析仓库提交，再从同一个提交下载三个 Skill/CLI 文件。重复安装可更新本安装器管理的文件，发现本地修改或同名非本项目命令时会停止。脚本不配置连接凭据，在 Agent 运行环境中另行设置：
+
+```text
+NOTES_API_URL=https://你的笔记域名/api/v1
+NOTES_API_TOKEN=从笔记网页创建的个人访问Token
+```
+
+该 Token 属于笔记账户，与数据库密码及 ConfigHub Token 用途不同。连接验证命令：`shiji-notes folders list`。安装不会连接数据库或创建笔记账号。
+
 - [Go 服务端运行说明](notes-server-go/README.md)：数据库迁移、CLI、测试、环境变量。
 - [Web 前端](notes-web/README.md)：Vite 默认5173，API默认8000。
 - [Agent Skill](notes-skill/shiji-notes/SKILL.md)：Python标准库客户端，服务端运行不依赖 Python。
