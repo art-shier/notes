@@ -27,7 +27,7 @@ sudo bash /opt/shiji/current/ops/native/start.sh
 sudo systemctl restart shiji.service
 ```
 
-开机先拉取配置，成功后启动 Go；运行中的业务请求不依赖 ConfigHub 实时在线。升级前先备份，重跑同一安装命令，可添加 `--version v0.1.0`。原生备份另需 PostgreSQL16客户端。更多参数、域名入口、升级与备份恢复见 [原生部署指南](notes-native-deployment.md)。
+开机先拉取配置，成功后启动 Go；运行中的业务请求不依赖 ConfigHub 实时在线。升级前先备份，重跑同一安装命令，可添加 `--version v0.1.0`。已发布 [v0.1.0 Linux 运行包](https://github.com/art-shier/notes/releases/tag/v0.1.0)，[完整CI](https://github.com/art-shier/notes/actions/runs/37130540349) 包含真实 systemd 与 TLS PostgreSQL 验证。原生备份另需 PostgreSQL16客户端。更多参数、域名入口、升级与备份恢复见 [原生部署指南](notes-native-deployment.md)。
 
 ## Docker 一行部署（可选）
 
