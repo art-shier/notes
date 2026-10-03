@@ -52,7 +52,8 @@ server=fixture/'notes-server-go'
 config=base/'config.json'; config.write_text(json.dumps({'project':'shier','environment':'prod','revision':1,'values':{'db_address':'host.docker.internal','db_port':'15432','db_username':'notes','db_password':password}})); config.chmod(0o600)
 cli=base/'confighub'; cli.write_text('#!/usr/bin/env bash\n[[ ! -e "$TEST_CONFIG_FAILURE" ]] || exit 7\ncat "$TEST_CONFIG"\n'); cli.chmod(0o700)
 start_env={**env,'TEST_CONFIG':str(config),'TEST_CONFIG_FAILURE':str(base/'fail')}
-def app(*args):return run(['docker','compose','--project-name',app_project,'--project-directory',str(server),'--env-file',str(server/'.env'),*args],env=env)
+# COMPOSE_FILE in the generated env is relative to the startup working directory.
+def app(*args):return run(['docker','compose','--project-name',app_project,'--project-directory',str(server),'--env-file',str(server/'.env'),*args],env=env,cwd=server)
 try:
     db('up','-d','--wait','--wait-timeout','120')
     run(['bash',str(server/'ops/start.sh'),'--domain','notes.ci.invalid','--project',app_project,'--config-hub-url','https://config.example.test','--config-hub-project','shier','--config-hub-env','prod','--cli-binary',str(cli)],env=start_env)
