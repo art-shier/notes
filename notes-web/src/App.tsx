@@ -56,4 +56,3 @@ function Workspace({account,theme,onTheme,onLogout}:{account:Account;theme:'ligh
   {message&&<div className="toast" role="status"><Check size={16}/>{message}</div>}
   </main>;
 }
-

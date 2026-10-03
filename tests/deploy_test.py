@@ -16,7 +16,10 @@ exit 0
 ''',
     'docker':'''#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$TEST_LOG"
-if [[ $1 == info || $* == *"compose version"* ]]; then exit 0; fi
+if [[ $1 == info ]]; then exit 0; fi
+if [[ $* == *"compose version"* ]]; then
+  [[ ${TEST_COMPOSE_MISSING:-0} != 1 || -f "$TEST_COMPOSE_MARKER" ]]; exit
+fi
 if [[ $* == *"psql"* ]]; then echo "${TEST_STATE:-empty}"; exit 0; fi
 if [[ $* == *"shiji bootstrap"* ]]; then echo 'https://notes.example.com/?invite=test-invitation-secret&email=admin@example.test'; exit 0; fi
 if [[ $* == *"build"* && ${TEST_BUILD_FAIL:-0} == 1 ]]; then exit 12; fi
@@ -26,6 +29,16 @@ exit 0
 printf '%s\\n' "$*" >> "$TEST_LOG"
 if [[ ${TEST_TLS_FAIL:-0} == 1 ]]; then exit 60; fi
 echo '{"status":"ready"}'
+''',
+    'sudo':'#!/usr/bin/env bash\nexec "$@"\n',
+    'apt-cache':'''#!/usr/bin/env bash
+if [[ $1 == policy && $2 == "$TEST_COMPOSE_PACKAGE" ]]; then echo '  Candidate: 2.29.0'; else echo '  Candidate: (none)'; fi
+''',
+    'apt-get':'''#!/usr/bin/env bash
+printf '%s\\n' "apt-get $*" >> "$TEST_LOG"
+if [[ $1 == update ]]; then exit 0; fi
+if [[ $* == "install -y $TEST_COMPOSE_PACKAGE" && -n $TEST_COMPOSE_PACKAGE ]]; then touch "$TEST_COMPOSE_MARKER"; exit 0; fi
+echo 'Package unavailable' >&2; exit 100
 '''}
     for name,data in fake.items():p=bin/name;p.write_text(data);p.chmod(0o755)
     def call(directory,*args,**extra):
@@ -50,5 +63,13 @@ echo '{"status":"ready"}'
     assert 'test-ephemeral-private-token' not in r.stdout+r.stderr+(base/'log').read_text()+(base/'private/notes-server-go/.env').read_text()
     assert '-c credential.helper= clone' in (base/'log').read_text()
     existing=base/'occupied';existing.mkdir();(existing/'keep.txt').write_text('keep');r=call(existing,*args);assert r.returncode!=0 and (existing/'keep.txt').read_text()=='keep'
+    for package in ('docker-compose-v2','docker-compose-plugin'):
+        marker=base/package
+        r=call(base/('missing-'+package),*args,TEST_COMPOSE_MISSING='1',TEST_COMPOSE_PACKAGE=package,TEST_COMPOSE_MARKER=str(marker).replace('\\','/'))
+        assert r.returncode==0,(package,r.stdout,r.stderr)
+        assert marker.exists()
+    unavailable=base/'compose-unavailable'
+    r=call(unavailable,*args,TEST_COMPOSE_MISSING='1',TEST_COMPOSE_PACKAGE='',TEST_COMPOSE_MARKER=str(base/'no-compose').replace('\\','/'))
+    assert r.returncode!=0 and not (unavailable/'notes-server-go/.env').exists()
     log=(base/'log').read_text();assert 'down' not in log and '--wait' in log
-print('PASS: fresh install, secret generation, rerun preservation, pending/registered admin, domain mismatch, invalid input, build/TLS failures, nonrepo preservation')
+print('PASS: fresh install, secret generation, rerun preservation, pending/registered admin, domain mismatch, invalid input, build/TLS failures, nonrepo preservation, Ubuntu/official Compose install, unavailable Compose')

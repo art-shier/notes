@@ -105,7 +105,18 @@ if ! docker info >/dev/null 2>&1; then
   "${DOCKER[@]}" info >/dev/null 2>&1 || die 'Docker 不可用；请检查 daemon 状态和权限。'
 fi
 if ! "${DOCKER[@]}" compose version >/dev/null 2>&1; then
-  apt_install docker-compose-plugin
+  command -v apt-get >/dev/null && command -v apt-cache >/dev/null || die '请先安装 Docker Compose v2 插件，然后重新执行。'
+  privilege
+  "${PRIV[@]}" apt-get update
+  compose_package=''
+  for candidate in docker-compose-plugin docker-compose-v2; do
+    if LC_ALL=C apt-cache policy "$candidate" | awk '/Candidate:/ && $2 != "(none)" {found=1} END {exit !found}'; then
+      compose_package=$candidate
+      break
+    fi
+  done
+  [[ -n $compose_package ]] || die '当前软件源没有 Compose v2；请先安装 Docker Compose v2 插件，然后重新执行。'
+  "${PRIV[@]}" apt-get install -y "$compose_package"
   "${DOCKER[@]}" compose version >/dev/null 2>&1 || die '需要 Docker Compose v2 插件。'
 fi
 
