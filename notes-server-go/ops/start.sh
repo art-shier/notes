@@ -4,6 +4,7 @@ set -Eeuo pipefail
 umask 077
 server_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
 cd "$server_dir"
+source "$server_dir/ops/config-hub-lib.sh"
 # Compose environment variables must come from the checked file, not ambient overrides.
 unset DATABASE_URL DOMAIN COMPOSE_FILE COMPOSE_PROJECT_NAME COMPOSE_ENV_FILES COMPOSE_PROFILES POSTGRES_PASSWORD NOTE_HISTORY_LIMIT EXPORT_LIMIT_BYTES
 domain='' project='' hub_url='' hub_project='' hub_env='' database='' token_file='' cli=''
@@ -72,27 +73,11 @@ if [[ -n $token_file ]]; then
 fi
 temp_dir=$(mktemp -d "$server_dir/.config-tmp.XXXXXX")
 printf '[拾记] 读取 ConfigHub %s/%s 配置\n' "$hub_project" "$hub_env"
-"${CLI[@]}" export --project "$hub_project" --env "$hub_env" --format json > "$temp_dir/config.json" || die 'ConfigHub 拉取失败；未启动或替换配置。'
-# Encode values as data; never source/eval a remote dotenv or print credentials.
-jq -e --arg database "$database" --arg project "$hub_project" --arg environment "$hub_env" '
-  select(.project == $project and .environment == $environment) | .values as $v |
-  {host: ($v.notes_db_address // $v.db_address), port: (($v.notes_db_port // $v.db_port) | tostring),
-   user: ($v.notes_db_username // $v.db_username), password: ($v.notes_db_password // $v.db_password),
-   database: $database, sslmode: ($v.notes_db_sslmode // "require")} |
-  select(.host | type == "string") | select(.host | test("^[A-Za-z0-9:.\\[\\]-]+$")) |
-  select(.port | test("^[0-9]{1,5}$")) | select((.port | tonumber) >= 1 and (.port | tonumber) <= 65535) |
-  select(.user | type == "string") | select(.user | length > 0) |
-  select(.password | type == "string") | select(.password | length > 0) |
-  select(.sslmode == "require" or .sslmode == "verify-ca" or .sslmode == "verify-full")
-' "$temp_dir/config.json" > "$temp_dir/database.json" 2>/dev/null || die '数据库字段缺失或无效；未覆盖配置。'
-jq -c '{host, port, user, database}' "$temp_dir/database.json" > "$temp_dir/target"
+shiji_read_database "$temp_dir" "$hub_project" "$hub_env" "$database" "${CLI[@]}" || die 'ConfigHub拉取或数据库字段校验失败；未覆盖配置。'
 if [[ -f .database-target ]]; then
   cmp -s -- .database-target "$temp_dir/target" || die '数据库主机/端口/名称/账号变化，拒绝自动切库；请先核对迁移计划。'
 fi
-database_url=$(jq -er '
-  (if (.host | contains(":")) and (.host | startswith("[") | not) then "[" + .host + "]" else .host end) as $host |
-  "postgresql://" + (.user | @uri) + ":" + (.password | @uri) + "@" + $host + ":" + .port + "/" + .database + "?sslmode=" + .sslmode + "&connect_timeout=10"
-' "$temp_dir/database.json")
+database_url=$(jq -er .uri "$temp_dir/database.json")
 history=200; export_limit=2147483648
 if [[ -f .env ]]; then
   history=$(sed -n 's/^NOTE_HISTORY_LIMIT=//p' .env); export_limit=$(sed -n 's/^EXPORT_LIMIT_BYTES=//p' .env)

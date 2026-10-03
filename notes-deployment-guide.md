@@ -1,6 +1,6 @@
 # 拾记：自有服务器部署、备份与恢复
 
-本轮已验证SQLite整库恢复，尚未连接正式服务器。Docker镜像、PostgreSQL、DNS和HTTPS仍需在目标服务器执行下述验收，不能用本地结果代替。
+服务提供原生 systemd 与 Docker Compose 两种部署。复用已有 PostgreSQL 和 HTTPS 反向代理时推荐 [原生部署指南](notes-native-deployment.md)，包含安装、升级、备份与恢复。下文为 Docker 运维步骤；域名证书、生产服务器和容量仍需在目标环境验收。
 
 首次安装可直接使用仓库根目录 [一行部署说明](README.md) 的 install.sh：自动下载、配置和启动。以下保留手动部署与备份恢复步骤。
 

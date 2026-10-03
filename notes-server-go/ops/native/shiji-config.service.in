@@ -1,0 +1,22 @@
+# Managed by art-shier/notes native installer
+[Unit]
+Description=Shiji configuration refresh from ConfigHub
+Wants=network-online.target
+After=network-online.target
+Before=@SERVICE@.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+UMask=0077
+ExecStart=/bin/bash @INSTALL@/current/ops/native/prepare.sh --config-dir @CONFIG@
+TimeoutStartSec=120
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@CONFIG@
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

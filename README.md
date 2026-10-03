@@ -2,9 +2,34 @@
 
 自托管、多用户私有笔记服务，移动端 Web 优先。首页按文件夹聚合，支持图文、标签、搜索、历史、回收站、离线 ZIP 导出。Agent 通过 Skill + REST API 读写，不需要 MCP。
 
-服务端 Go + Gin + GORM；前端 React + TypeScript + Tiptap；生产 PostgreSQL 16，Caddy 提供 HTTPS。
+服务端 Go + Gin + GORM；前端 React + TypeScript + Tiptap；生产 PostgreSQL 16，Nginx/Caddy 提供 HTTPS。
 
-## 一行部署
+## 原生一行部署（无需 Docker）
+
+适用于 Linux + systemd，支持 amd64/arm64。下载编译好的 Go/Web，通过 ConfigHub 连接已有 PostgreSQL；服务器不需要 Go、Node、Python 或 Docker。
+
+将 ConfigHub Token 安全上传至服务器 `/root/shier-prod.token`，设为 root 所有、权限600；默认读取 `https://config.shier.art` 的 `shier/prod`，数据库为 `notes`。主机/端口沿用 `db_address`、`db_port`，使用笔记专用 `notes_db_username`、`notes_db_password`。Windows 的 CLI 配置不会自动同步到服务器。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install-native.sh | sudo bash -s -- --domain notes.example.com --email you@example.com --token-file /root/shier-prod.token
+```
+
+替换域名和邮箱。脚本验证 Release SHA-256，安装或复用 ConfigHub CLI，创建专用 OS 账号，拉取及预检数据库配置，生成私有配置，迁移并启动 systemd 服务，最后输出管理员邀请。默认程序 `/opt/shiji`、配置 `/etc/shiji`、附件与导出 `/var/lib/shiji`；已有数据和账户保留。Debian/Ubuntu 自动安装缺少的 curl/jq/tar/util-linux。
+
+**HTTPS 由现有 Nginx/Caddy 提供。** Go 只监听 `127.0.0.1:8000`；脚本生成 `/etc/shiji/nginx-location.conf`、`/etc/shiji/caddy-site.conf`，加入该域名的反向代理配置并重载后再打开邀请链接。脚本不自动修改其他站点或签发证书。
+
+```bash
+sudo systemctl status shiji.service
+sudo journalctl -u shiji.service -u shiji-config.service -f
+# 拉取配置并预检，成功后重启；失败保留正在运行的服务
+sudo bash /opt/shiji/current/ops/native/start.sh
+# 仅重启，使用最后一次配置
+sudo systemctl restart shiji.service
+```
+
+开机先拉取配置，成功后启动 Go；运行中的业务请求不依赖 ConfigHub 实时在线。升级前先备份，重跑同一安装命令，可添加 `--version v0.1.0`。原生备份另需 PostgreSQL16客户端。更多参数、域名入口、升级与备份恢复见 [原生部署指南](notes-native-deployment.md)。
+
+## Docker 一行部署（可选）
 
 适用于 Linux 服务器；自动安装缺失的 Docker/Git 支持 Ubuntu/Debian。其他发行版先安装 Docker Engine、Compose v2、Git、curl。先将域名 A/AAAA 解析到服务器，并开放 TCP 80/443；确保端口未被其他服务占用。建议至少 2核/4GB，并预留附件和备份磁盘空间。
 
@@ -30,7 +55,7 @@ curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install.sh | b
 
 启动流程为 **ConfigHub CLI 拉取 JSON → 校验数据库字段 → 构建及只读连接检查 → 原子生成私有 .env → 启动 Go/Web 与 Caddy**。该模式不启动本地 PostgreSQL。
 
-先在已有 PostgreSQL16 中准备独立的 `notes` 数据库和专用账号。启动脚本要求目标库为空库或已经迁移的笔记库，不创建外部数据库，也不会把已有独立部署的数据自动搬过去。推荐在 ConfigHub 配置 `notes_db_address`、`notes_db_port`、`notes_db_username`、`notes_db_password`；缺少这些专用字段时使用 `db_address`、`db_port`、`db_username`、`db_password`。数据库名通过 `--database-name` 指定，默认 `notes`。当前共享配置账号为超级管理员，正式部署应补充笔记专用账号的配置。
+先在已有 PostgreSQL16 中准备独立的 `notes` 数据库和专用账号。启动脚本要求目标库为空库或已经迁移的笔记库，不创建外部数据库，也不会把已有独立部署的数据自动搬过去。推荐在 ConfigHub 配置 `notes_db_address`、`notes_db_port`、`notes_db_username`、`notes_db_password`；缺少这些专用字段时使用 `db_address`、`db_port`、`db_username`、`db_password`。数据库名通过 `--database-name` 指定，默认 `notes`。目前 `shier/prod` 已配置笔记专用账号 `notes_app`，主机和端口复用共享字段。
 
 在**实际部署服务器**配置 CLI 的 Token，或准备一个只有运行用户可读的 Token 文件（Linux权限600）。本机 Windows 的 CLI 配置不会自动同步到服务器。然后替换域名和邮箱执行：
 
@@ -51,7 +76,7 @@ bash ops/start.sh
 
 `docker compose restart` 和服务器重启后的 Docker 自动恢复会使用最后一次生成的配置；需要重新拉取时执行 `ops/start.sh`。ConfigHub 只用于启动前拉取，业务请求不依赖它实时在线。直接运行 `docker compose config` 会显示数据库连接信息，请使用 `--quiet` 做检查。
 
-## 常用运维
+## Docker 常用运维
 
 ```bash
 cd ~/notes/notes-server-go
@@ -112,7 +137,7 @@ NOTES_API_TOKEN=从笔记网页创建的个人访问Token
 - [Agent Skill](notes-skill/shiji-notes/SKILL.md)：Python标准库客户端，服务端运行不依赖 Python。
 - [技术方案](notes-technical-plan.md)与[Go迁移记录](notes-go-migration-plan.md)。
 
-一键脚本有模拟命令回归；[CI](https://github.com/art-shier/notes/actions) 验证 Go 测试/竞态/vet、Web 测试/构建、安装脚本，以及真实 Docker + PostgreSQL 16 的 API 和完整备份恢复。[首轮验证已通过](https://github.com/art-shier/notes/actions/runs/37112169790)。域名证书、服务器环境和生产容量仍需在目标服务器验收；HTTPS 校验不会跳过 TLS 证书检查。
+一键脚本有模拟命令回归；[CI](https://github.com/art-shier/notes/actions) 验证 Go 测试/竞态/vet、Web 测试/构建、安装脚本，以及真实 systemd 原生 Go/Web、TLS PostgreSQL16、Docker API 和完整备份恢复。[首轮验证已通过](https://github.com/art-shier/notes/actions/runs/37112169790)。域名证书、服务器环境和生产容量仍需在目标服务器验收；HTTPS 校验不会跳过 TLS 证书检查。
 
 私有仓库副本可通过API下载脚本并使用临时Token克隆（Token只用于认证，不写入Git远程地址或配置）：
 

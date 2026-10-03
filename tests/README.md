@@ -1,5 +1,9 @@
 # 部署脚本测试
 
+`python3 tests/native_config_test.py` 验证原生配置读取、私有 env、URI编码、环境隔离、密码轮换、失败保留及固定目标。`python3 tests/native_install_test.py` 使用临时目录与模拟系统边界验证 Linux/root、参数、受保护的独立目录、坏校验和危险归档。
+
+CI 的 `native-systemd` 作业编译 amd64/arm64 运行包，执行 `sudo env CI=true python3 tests/native_smoke.py 运行包目录`。使用真实 Linux systemd、随机独立非root账号、宿主机原生 Go/Web、临时 TLS PostgreSQL16；验证迁移/邀请、重复安装、600权限、失败刷新保留PID/env、模拟开机失败阻止启动后恢复。Docker 仅提供测试数据库；不会访问正式 ConfigHub 或生产数据库，仅清理随机专用单元、账号、目录及测试卷。
+
 `python3 tests/client_install_test.py` 使用临时目录安装真实 CLI/Skill，验证带空格路径下的命令帮助、重复安装，以及自定义文件、无关命令、下载源缺失和符号链接保护。CI分别在 Linux 和 Windows 执行，并在 Windows 验证 PowerShell入口；不会配置访问Token或修改真实用户的Skill目录。
 
 `python3 tests/config_hub_start_test.py` 使用真实 jq 和临时目录执行启动脚本，模拟 ConfigHub/容器外部边界：特殊字符URL编码、无关秘密不导出、环境变量覆盖隔离、重复拉取、密码更新、失败保留旧配置、目标锁定及并发/原部署保护。Linux需要jq；Windows开发回归使用work中的官方jq工具，生产不依赖Python。

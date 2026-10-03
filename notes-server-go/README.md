@@ -21,9 +21,11 @@ $env:APP_ORIGIN='http://127.0.0.1:5173'
 
 环境配置沿用 DATABASE_URL、APP_ORIGIN、COOKIE_SECURE、ATTACHMENTS_DIR、EXPORTS_DIR、NOTE_HISTORY_LIMIT、EXPORT_LIMIT_BYTES；Go 增加 LISTEN_ADDR。数据库 URL 使用 `postgresql://`，服务端无需 Python。
 
-正式部署从本目录使用 Docker Compose；复制 `.env.example` 为 `.env`，配置域名与随机数据库密码。Caddy 终止 HTTPS，Go 同时提供静态 Web 和 `/api/v1`，数据库及私有附件不公开映射。服务端容器包含 PostgreSQL 16 客户端。详见上级 `notes-deployment-guide.md`。
+推荐根目录 `install-native.sh` 下载 Linux Go/Web，由 systemd 管理非root服务，通过 ConfigHub 连接已有 PostgreSQL，Nginx/Caddy 提供 HTTPS。原生脚本在 `ops/native`；`ops/build-native.sh` 构建 amd64/arm64 Release。刷新配置执行 `sudo bash /opt/shiji/current/ops/native/start.sh`；普通 `systemctl restart shiji` 复用上次配置。详见上级 [原生部署指南](../notes-native-deployment.md)。
 
-离线备份：所有实例停止后执行 `shiji backup-create --output 新目录 --app-stopped`；校验 `shiji backup-verify --backup 目录`；指向空的新环境执行 `shiji backup-restore --backup 目录 --app-stopped`。Compose 运维脚本位于 ops。恢复保留密码和 Token，清除会话及临时导出。
+也可从本目录使用 Docker Compose；复制 `.env.example` 为 `.env`，配置域名与随机数据库密码。Caddy 终止 HTTPS，Go 同时提供静态 Web 和 `/api/v1`，数据库及私有附件不公开映射。服务端容器包含 PostgreSQL 16 客户端。详见上级 `notes-deployment-guide.md`。
+
+离线备份：所有实例停止后执行 `shiji backup-create --output 新目录 --app-stopped`；校验 `shiji backup-verify --backup 目录`；指向空的新环境执行 `shiji backup-restore --backup 目录 --app-stopped`。Compose 运维脚本位于 ops；原生通过 `ops/native/admin.sh` 执行管理命令，另需安装 PostgreSQL16客户端。恢复保留密码和 Token，清除会话及临时导出。
 
 ## 兼容性
 

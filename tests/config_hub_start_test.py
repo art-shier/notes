@@ -4,10 +4,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BASH = shutil.which('bash') if os.name != 'nt' else 'C:/Program Files/Git/bin/bash.exe'
-JQ = shutil.which('jq') if os.name != 'nt' else str(ROOT.parent/'work/jq.exe')
+JQ = shutil.which('jq') if os.name != 'nt' else os.environ.get('NOTES_TEST_JQ',str(ROOT.parent/'work/jq.exe'))
 with tempfile.TemporaryDirectory(prefix='confighub-start-') as temp:
     base = Path(temp); server = base/'notes-server-go'; (server/'ops').mkdir(parents=True)
-    for name in ('start.sh',):
+    for name in ('start.sh','config-hub-lib.sh'):
         source = ROOT/'notes-server-go/ops'/name
         assert source.exists(), 'startup pipeline is not implemented'
         shutil.copyfile(source, server/'ops'/name)
