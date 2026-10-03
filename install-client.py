@@ -102,13 +102,14 @@ def install(args):
                 destination=new/name;destination.parent.mkdir(parents=True,exist_ok=True);destination.write_bytes(data)
             with tempfile.NamedTemporaryFile(prefix='.shiji-command-',dir=bin_dir,delete=False) as handle:
                 staged_command=Path(handle.name);handle.write(command)
+            command_backup=None
             try:
                 staged_command.chmod(0o755)
                 existed=target.exists()
                 previous_command=launcher.read_bytes() if launcher.exists() else None
-                command_backup=stage/'command-old'
                 if previous_command is not None:
-                    command_backup.write_bytes(previous_command)
+                    with tempfile.NamedTemporaryFile(prefix='.shiji-backup-',dir=bin_dir,delete=False) as handle:
+                        command_backup=Path(handle.name);handle.write(previous_command)
                     command_backup.chmod(launcher.stat().st_mode&0o777)
                 try:
                     if existed: target.rename(old)
@@ -127,6 +128,7 @@ def install(args):
                     raise
             finally:
                 staged_command.unlink(missing_ok=True)
+                if command_backup is not None: command_backup.unlink(missing_ok=True)
     finally:
         lock.rmdir()
     print('Installed Shiji CLI:',launcher)

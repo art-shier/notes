@@ -42,6 +42,7 @@ with tempfile.TemporaryDirectory(prefix='notes-client-test-') as temporary:
     assert launcher.read_bytes()==original_command and (target/'SKILL.md').read_bytes()==original_skill
     replace=module.os.replace;original_mode=launcher.stat().st_mode&0o777
     def late_interruption(source,destination):
+        if Path(source).parent!=Path(destination).parent:raise OSError('Fixture cross-filesystem rename')
         replace(source,destination)
         if Path(source).name.startswith('.shiji-command-'):raise KeyboardInterrupt()
     with patch.object(module,'launcher_bytes',return_value=original_command+b'\n'),patch.object(module.os,'replace',late_interruption):
