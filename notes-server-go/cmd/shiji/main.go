@@ -81,7 +81,7 @@ func run(args []string) error {
 			return fmt.Errorf("service not ready")
 		}
 		return nil
-	case "serve", "migrate", "bootstrap", "invite":
+	case "serve", "migrate", "bootstrap", "invite", "database-check", "bootstrap-status":
 	default:
 		return fmt.Errorf("unknown command %q", command)
 	}
@@ -90,11 +90,22 @@ func run(args []string) error {
 		return e
 	}
 	defer store.Close(db)
+	if command == "database-check" {
+		return deploymentCheck(db)
+	}
 	if command == "migrate" {
 		return store.Migrate(db)
 	}
 	if e = store.Check(db); e != nil {
 		return e
+	}
+	if command == "bootstrap-status" {
+		state, err := bootstrapState(db)
+		if err != nil {
+			return err
+		}
+		fmt.Println(state)
+		return nil
 	}
 	if command == "bootstrap" || command == "invite" {
 		if *email == "" {

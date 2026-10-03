@@ -1,0 +1,5 @@
+# A second app-only project connects to the first project's disposable PG server.
+networks:
+  default:
+    external: true
+    name: ${TEST_DB_NETWORK:?Set disposable source project network}

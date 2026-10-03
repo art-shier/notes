@@ -16,3 +16,8 @@
 !**/.env.example
 **/.bootstrap-invite*
 **/.install.lock
+**/.config-hub.json
+**/.database-target
+**/.config-tmp.*
+**/.tools
+**/.confighub.yaml

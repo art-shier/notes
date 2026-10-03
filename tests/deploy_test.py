@@ -4,7 +4,11 @@ ROOT=Path(__file__).resolve().parent.parent
 import shutil
 BASH=shutil.which('bash') if os.name!='nt' else 'C:/Program Files/Git/bin/bash.exe'
 with tempfile.TemporaryDirectory(prefix='deploy-test-',dir=None) as temp:
-    base=Path(temp);bin=base/'bin';bin.mkdir();fixture=base/'fixture';(fixture/'notes-server-go').mkdir(parents=True);(fixture/'notes-server-go/compose.yaml').write_text('services: {}\n')
+    base=Path(temp);bin=base/'bin';bin.mkdir();fixture=base/'fixture';(fixture/'notes-server-go/ops').mkdir(parents=True);(fixture/'notes-server-go/compose.yaml').write_text('services: {}\n')
+    (fixture/'notes-server-go/ops/start.sh').write_text('''#!/usr/bin/env bash
+printf 'start %s\\n' "$*" >> "$TEST_LOG"
+printf 'DOMAIN=notes.example.com\\nCOMPOSE_PROJECT_NAME=shiji\\nCOMPOSE_FILE=compose.external.yaml\\n' > "$(dirname "$0")/../.env"
+''')
     fake={
     'uname':'#!/usr/bin/env bash\necho Linux\n',
     'git':'''#!/usr/bin/env bash
@@ -20,7 +24,8 @@ if [[ $1 == info ]]; then exit 0; fi
 if [[ $* == *"compose version"* ]]; then
   [[ ${TEST_COMPOSE_MISSING:-0} != 1 || -f "$TEST_COMPOSE_MARKER" ]]; exit
 fi
-if [[ $* == *"psql"* ]]; then echo "${TEST_STATE:-empty}"; exit 0; fi
+if [[ $* == *"bootstrap-status"* && ${TEST_OLD_APP:-0} == 1 ]]; then exit 2; fi
+if [[ $* == *"psql"* || $* == *"bootstrap-status"* ]]; then echo "${TEST_STATE:-empty}"; exit 0; fi
 if [[ $* == *"shiji bootstrap"* ]]; then echo 'https://notes.example.com/?invite=test-invitation-secret&email=admin@example.test'; exit 0; fi
 if [[ $* == *"build"* && ${TEST_BUILD_FAIL:-0} == 1 ]]; then exit 12; fi
 exit 0
@@ -31,6 +36,8 @@ if [[ ${TEST_TLS_FAIL:-0} == 1 ]]; then exit 60; fi
 echo '{"status":"ready"}'
 ''',
     'sudo':'#!/usr/bin/env bash\nexec "$@"\n',
+    'jq':'#!/usr/bin/env bash\nexit 0\n',
+    'confighub':'#!/usr/bin/env bash\nexit 0\n',
     'apt-cache':'''#!/usr/bin/env bash
 if [[ $1 == policy && $2 == "$TEST_COMPOSE_PACKAGE" ]]; then echo '  Candidate: 2.29.0'; else echo '  Candidate: (none)'; fi
 ''',
@@ -71,5 +78,19 @@ echo 'Package unavailable' >&2; exit 100
     unavailable=base/'compose-unavailable'
     r=call(unavailable,*args,TEST_COMPOSE_MISSING='1',TEST_COMPOSE_PACKAGE='',TEST_COMPOSE_MARKER=str(base/'no-compose').replace('\\','/'))
     assert r.returncode!=0 and not (unavailable/'notes-server-go/.env').exists()
+    checkpoint=(base/'log').read_text()
+    r=call(base/'hub',*args,'--config-hub','--config-hub-project','shier','--config-hub-env','prod','--database-name','notes','--token-file','/private/hub.token')
+    assert r.returncode==0,(r.stdout,r.stderr)
+    newlog=(base/'log').read_text()[len(checkpoint):]
+    assert '--config-hub-project shier --config-hub-env prod' in newlog and '--token-file /private/hub.token' in newlog
+    assert 'bootstrap-status' in newlog and 'psql' not in newlog
+    assert 'POSTGRES_PASSWORD' not in (base/'hub/notes-server-go/.env').read_text()
+    (base/'hub/notes-server-go/.config-hub.json').write_text('{}')
+    checkpoint=(base/'log').read_text()
+    r=call(base/'hub',*args,'--config-hub-url','https://replacement.example.test')
+    assert r.returncode==0,(r.stdout,r.stderr)
+    assert '--config-hub-url https://replacement.example.test' in (base/'log').read_text()[len(checkpoint):]
+    r=call(base/'old-checkout',*args,TEST_OLD_APP='1',TEST_STATE='registered')
+    assert r.returncode==0,(r.stdout,r.stderr)
     log=(base/'log').read_text();assert 'down' not in log and '--wait' in log
 print('PASS: fresh install, secret generation, rerun preservation, pending/registered admin, domain mismatch, invalid input, build/TLS failures, nonrepo preservation, Ubuntu/official Compose install, unavailable Compose')

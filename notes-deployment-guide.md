@@ -96,6 +96,12 @@ shiji serve
 
 ## 6. 本轮证据
 
+### ConfigHub 外部数据库模式
+
+首次部署与后续配置刷新参见根 [README](README.md#confighub--已有-postgresql-部署)。`ops/start.sh` 在启动前调用 CLI 拉取、生成配置并执行只读数据库预检；不创建外部库、不改其他业务库。启动目标使用 `compose.external.yaml`，只包含 app/caddy，图片仍存放在本项目持久卷。
+
+备份仍使用 `ops/backup.sh`，会暂停本项目 app 并由容器中的 PostgreSQL16客户端连接外部数据库。恢复时，新项目的 `.env` 必须指向**已创建的独立空数据库**，同时设置 `COMPOSE_FILE=compose.external.yaml`；`ops/restore.sh` 检测不到本地 db 服务时跳过创建数据库容器，先执行 Go 只读连接检查，再由恢复工具核验空库和空附件目录。恢复后直接启动 app/caddy即可；后续 ConfigHub 刷新必须使用恢复目标对应的项目/环境/专用账号配置。
+
 Go迁移验证记录见 [Go迁移实施计划](notes-go-migration-plan.md)，旧阶段记录保留在 [部署与恢复阶段方案](notes-operations-phase-plan.md)。本地使用真实迁移的隔离库，通过独立Go CLI进程备份/校验/恢复，再启动恢复库API；旧密码、Token、图文与历史均可继续使用。主预览已切换Go，未创建测试账号。
 
 [Linux CI 已通过](https://github.com/art-shier/notes/actions/runs/37112169790)：生产 Docker 镜像构建、真实 PostgreSQL16 的图文/标签/版本/历史/导出，以及原生数据库备份恢复。恢复后的密码、Token和图片保留，旧网页会话失效。自动安装系统依赖的控制流程使用模拟命令回归；真实域名证书、服务器权限/端口和容量仍需在目标服务器验收。

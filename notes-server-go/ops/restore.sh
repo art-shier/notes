@@ -11,12 +11,17 @@ docker compose config --quiet
 [[ -z $(docker compose ps -aq app) ]] || { echo 'Restore only into a new Compose project, before creating its application container.' >&2; exit 2; }
 # Validate before starting or writing the destination database.
 docker compose run --rm --no-deps --volume "$source:/backup:ro" --entrypoint shiji app backup-verify --backup /backup
-docker compose up -d db
-ready=false
-for attempt in {1..30}; do
-  if docker compose exec -T db pg_isready -U notes -d notes >/dev/null 2>&1; then ready=true; break; fi
-  sleep 2
-done
-[[ $ready == true ]] || { echo 'Destination database did not become ready.' >&2; exit 1; }
+if docker compose config --services | grep -qx db; then
+  docker compose up -d db
+  ready=false
+  for attempt in {1..30}; do
+    if docker compose exec -T db pg_isready -U notes -d notes >/dev/null 2>&1; then ready=true; break; fi
+    sleep 2
+  done
+  [[ $ready == true ]] || { echo 'Destination database did not become ready.' >&2; exit 1; }
+else
+  # External destination must already exist. The Go restore checks emptiness again.
+  docker compose run --rm --no-deps --entrypoint shiji app database-check
+fi
 docker compose run --rm --no-deps --volume "$source:/backup:ro" --entrypoint shiji app backup-restore --backup /backup --app-stopped
 echo 'Restore verified. Application and Caddy are not started. Review domain/ports, then start and run ops/check.sh.'

@@ -1,0 +1,44 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: notes-server-go/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Generate configuration with ops/start.sh}
+      APP_ORIGIN: https://${DOMAIN:?Set DOMAIN}
+      COOKIE_SECURE: 'true'
+      ATTACHMENTS_DIR: /data/attachments
+      EXPORTS_DIR: /data/exports
+      NOTE_HISTORY_LIMIT: ${NOTE_HISTORY_LIMIT:-200}
+      EXPORT_LIMIT_BYTES: ${EXPORT_LIMIT_BYTES:-2147483648}
+    volumes:
+      - attachments:/data/attachments
+      - exports:/data/exports
+    restart: unless-stopped
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    healthcheck:
+      test: [CMD, shiji, health]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  attachments:
+  exports:
+  caddy_data:
+  caddy_config:

@@ -26,6 +26,31 @@ curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install.sh | b
 
 重复执行会保留已有配置、密码和数据，也不会自动更新已有 Git 代码。输入域名与已有配置不同会拒绝；已有非本项目目录不会覆盖；失败不会自动删除持久卷。若安装进程被强制终止，确认没有其他安装运行后再移除 `notes-server-go/.install.lock` 目录。
 
+## ConfigHub + 已有 PostgreSQL 部署
+
+启动流程为 **ConfigHub CLI 拉取 JSON → 校验数据库字段 → 构建及只读连接检查 → 原子生成私有 .env → 启动 Go/Web 与 Caddy**。该模式不启动本地 PostgreSQL。
+
+先在已有 PostgreSQL16 中准备独立的 `notes` 数据库和专用账号。启动脚本要求目标库为空库或已经迁移的笔记库，不创建外部数据库，也不会把已有独立部署的数据自动搬过去。推荐在 ConfigHub 配置 `notes_db_address`、`notes_db_port`、`notes_db_username`、`notes_db_password`；缺少这些专用字段时使用 `db_address`、`db_port`、`db_username`、`db_password`。数据库名通过 `--database-name` 指定，默认 `notes`。当前共享配置账号为超级管理员，正式部署应补充笔记专用账号的配置。
+
+在**实际部署服务器**配置 CLI 的 Token，或准备一个只有运行用户可读的 Token 文件（Linux权限600）。本机 Windows 的 CLI 配置不会自动同步到服务器。然后替换域名和邮箱执行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install.sh | bash -s -- --domain notes.example.com --email you@example.com --config-hub --config-hub-project shier --config-hub-env prod --database-name notes --token-file /private/shier-prod.token
+```
+
+安装器复用已安装的 ConfigHub CLI；缺少时从其官方 Release 安装并校验 SHA-256，放在项目 `.tools` 目录。服务器已有全局 CLI Token 时可省略 `--token-file`。ConfigHub URL 默认 `https://config.shier.art`，可通过 `--config-hub-url` 指定其他 HTTPS 服务。
+
+以后从相同部署用户的终端启动或刷新配置：
+
+```bash
+cd ~/notes/notes-server-go
+bash ops/start.sh
+```
+
+项目/环境、域名等启动参数保存在 `.config-hub.json`；数据库目标记录在 `.database-target`；凭据只进入权限600的 `.env`，不会输出到日志。拉取失败、字段错误或只读数据库预检失败时，保留上次配置和运行容器。密码更新经检查后可生效；主机、端口、库名、账号或 Compose 项目改变会拒绝自动切换。`notes_db_sslmode` 可设为 `require`（默认）、`verify-ca` 或 `verify-full`；后两项要求容器具备对应 CA 信任配置。
+
+`docker compose restart` 和服务器重启后的 Docker 自动恢复会使用最后一次生成的配置；需要重新拉取时执行 `ops/start.sh`。ConfigHub 只用于启动前拉取，业务请求不依赖它实时在线。直接运行 `docker compose config` 会显示数据库连接信息，请使用 `--quiet` 做检查。
+
 ## 常用运维
 
 ```bash
@@ -45,7 +70,7 @@ cd ~/notes/notes-server-go
 sudo bash ops/backup.sh /srv/shiji-backups/新的备份目录
 git -C .. pull --ff-only
 docker compose build --pull app
-docker compose up -d --wait --wait-timeout 180
+bash ops/start.sh
 bash ops/check.sh https://notes.example.com
 ```
 

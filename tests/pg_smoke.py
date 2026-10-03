@@ -8,7 +8,11 @@ env={**os.environ,'DOMAIN':'ci.example.test','POSTGRES_PASSWORD':password}
 projects=['shiji-ci-'+secrets.token_hex(5), 'shiji-restore-'+secrets.token_hex(5)]
 def compose(index,*args):
     e={**env,'TEST_PORT':str(18000+index)}
-    r=subprocess.run(['docker','compose','--project-name',projects[index],'-f',str(ROOT/'notes-server-go/compose.yaml'),'-f',str(ROOT/'tests/compose.ci.yaml'),*args],env=e,capture_output=True,text=True)
+    files=['-f',str(ROOT/'notes-server-go'/('compose.yaml' if index==0 else 'compose.external.yaml')),'-f',str(ROOT/'tests/compose.ci.yaml')]
+    if index==1:
+        e.update(DATABASE_URL=f'postgresql://notes:{password}@db:5432/notes_restore',TEST_DB_NETWORK=projects[0]+'_default')
+        files+=['-f',str(ROOT/'tests/compose.external.ci.yaml')]
+    r=subprocess.run(['docker','compose','--project-name',projects[index],*files,*args],env=e,capture_output=True,text=True)
     if r.returncode:raise RuntimeError(f'Compose {args[0]} failed: {r.stderr}')
     return r.stdout.strip()
 class API:
@@ -27,9 +31,12 @@ image=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',1,1,8,2,0,0,0))+
 backup=Path(tempfile.mkdtemp(prefix='shiji-ci-backup-'));backup.chmod(0o777)
 try:
     compose(0,'up','-d','--no-build','--wait','--wait-timeout','180','db','app')
+    assert compose(0,'exec','-T','app','shiji','bootstrap-status')=='empty'
     api=API(0);email='ci-'+secrets.token_hex(4)+'@example.test';pwd=secrets.token_urlsafe(24)
     invite=urllib.parse.parse_qs(urllib.parse.urlparse(compose(0,'exec','-T','app','shiji','bootstrap','--email',email)).query)['invite'][0]
+    assert compose(0,'exec','-T','app','shiji','bootstrap-status')=='pending'
     account=api.call('POST','/auth/register',{'email':email,'password':pwd,'display_name':'CI','invitation':invite},201);api.csrf=account['csrf_token']
+    assert compose(0,'exec','-T','app','shiji','bootstrap-status')=='registered'
     cookie='; '.join(c.name+'='+c.value for c in api.jar)
     folder=api.call('GET','/folders')['items'][0]['id']
     boundary='ci-'+secrets.token_hex(8)
@@ -54,14 +61,29 @@ try:
     mount=f'{backup}:/backup'
     compose(0,'run','--rm','--no-deps','--volume',mount,'--entrypoint','shiji','app','backup-create','--output','/backup/snapshot','--app-stopped')
     compose(0,'run','--rm','--no-deps','--volume',mount,'--entrypoint','shiji','app','backup-verify','--backup','/backup/snapshot')
-    compose(1,'up','-d','--wait','--wait-timeout','120','db')
-    compose(1,'run','--rm','--no-deps','--volume',mount,'--entrypoint','shiji','app','backup-restore','--backup','/backup/snapshot','--app-stopped')
+    assert set(compose(1,'config','--services').splitlines())=={'app','caddy'}
+    compose(0,'exec','-T','db','psql','-U','notes','-d','postgres','-c','CREATE DATABASE notes_restore OWNER notes')
+    compose(1,'run','--rm','--no-deps','--entrypoint','shiji','app','database-check')
+    compose(0,'exec','-T','db','psql','-U','notes','-d','notes_restore','-c','CREATE TABLE unrelated_business (id integer)')
+    try:
+        compose(1,'run','--rm','--no-deps','--entrypoint','shiji','app','database-check')
+    except RuntimeError as error:
+        assert 'refusing deployment' in str(error)
+    else:raise AssertionError('preflight accepted unrelated database')
+    compose(0,'exec','-T','db','psql','-U','notes','-d','notes_restore','-c','DROP TABLE unrelated_business')
+    restore_env={**env,'TEST_PORT':'18001','COMPOSE_PROJECT_NAME':projects[1],
+        'DATABASE_URL':f'postgresql://notes:{password}@db:5432/notes_restore','TEST_DB_NETWORK':projects[0]+'_default',
+        'COMPOSE_FILE':os.pathsep.join(str(ROOT/p) for p in ['notes-server-go/compose.external.yaml','tests/compose.ci.yaml','tests/compose.external.ci.yaml'])}
+    restored_process=subprocess.run(['sudo','-E','bash',str(ROOT/'notes-server-go/ops/restore.sh'),str(backup/'snapshot')],env=restore_env,capture_output=True,text=True)
+    if restored_process.returncode:raise RuntimeError('External restore.sh failed: '+restored_process.stderr)
     compose(1,'up','-d','--no-build','--wait','--wait-timeout','180','app')
+    assert compose(1,'exec','-T','app','shiji','bootstrap-status')=='registered'
+    compose(1,'exec','-T','app','shiji','database-check')
     recovered=API(1);assert recovered.call('GET','/notes/'+note['id'],headers=agent)['version']==4
     assert recovered.call('GET','/attachments/'+pic['id'],headers=agent)==image
     recovered.call('GET','/me',expect=401,headers={'Cookie':cookie})
     assert recovered.call('POST','/auth/login',{'email':email,'password':pwd})['email']==email
-    print('PASS: Docker + PG16 auth/image/tag/CAS/idempotency/history/export and native dump/restore; token/password preserved, session invalidated')
+    print('PASS: Docker + PG16 auth/image/tag/CAS/idempotency/history/export, external app-only deployment, empty/unrelated/notes DB preflight and bootstrap state; dump/restore preserves token/password and invalidates session')
 finally:
     for i in (1,0):
         try:compose(i,'down','--volumes','--remove-orphans')

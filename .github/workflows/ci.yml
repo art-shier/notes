@@ -33,8 +33,10 @@ jobs:
           npm run build
       - name: Installer syntax and regression
         run: |
-          bash -n install.sh notes-server-go/ops/*.sh
+          for script in install.sh notes-server-go/ops/*.sh; do bash -n "$script"; done
+          if ! command -v jq >/dev/null; then sudo apt-get update && sudo apt-get install -y jq; fi
           python3 tests/deploy_test.py
+          python3 tests/config_hub_start_test.py
   docker-postgres:
     runs-on: ubuntu-latest
     steps:
@@ -43,3 +45,5 @@ jobs:
         run: docker build -f notes-server-go/Dockerfile -t shiji-ci .
       - name: PostgreSQL 16 API and backup restore smoke
         run: python3 tests/pg_smoke.py
+      - name: Real ConfigHub startup with TLS PostgreSQL
+        run: python3 tests/startup_smoke.py

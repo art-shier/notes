@@ -23,3 +23,8 @@ notes-server/
 notes-mobile-web.html
 .install.lock/
 **/.install.lock/
+**/.config-hub.json
+**/.database-target
+**/.config-tmp.*/
+**/.tools/
+**/.confighub.yaml
