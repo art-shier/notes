@@ -19,13 +19,15 @@ if os.environ.get('CI') != 'true' or os.geteuid() != 0:
 ROOT = Path(__file__).resolve().parents[1]
 packages = Path(sys.argv[1]).resolve()
 name = 'notes-ci-' + secrets.token_hex(5)
-install = Path('/opt') / name
-config = Path('/etc') / name
-data = Path('/var/lib') / name
+# Hosted runners may have writable /opt caches. Use dedicated root children,
+# preserving production's strict ancestor checks without changing shared paths.
+install = Path('/')/(name+'-install')
+config = Path('/')/(name+'-config')
+data = Path('/')/(name+'-data')
 base = Path(tempfile.mkdtemp(prefix=name + '-'))
 password = secrets.token_hex(32)
 email = name + '@example.test'
-unit_dir = Path('/etc')/(name+'-units')
+unit_dir = Path('/')/(name+'-units')
 db_project = name + '-db'
 
 def free_port():
@@ -95,7 +97,7 @@ volumes:
 try:
     db('up', '-d', '--wait', '--wait-timeout', '120')
     # The CLI fixture must be visible inside systemd's private /tmp and home restrictions.
-    tools = Path('/opt')/(name+'-fixture')
+    tools = Path('/')/(name+'-fixture')
     tools.mkdir(mode=0o755)
     config.mkdir(mode=0o700)
     fixture = tools/'config.json'
@@ -216,7 +218,7 @@ finally:
     except Exception:
         print('Fixture DB cleanup failed')
     # Only the exact random directories created above are removable.
-    for folder in [install,config,data,unit_dir,Path('/opt')/(name+'-fixture'),base]:
+    for folder in [install,config,data,unit_dir,Path('/')/(name+'-fixture'),base]:
         assert name in folder.name and folder.resolve() == folder
         if folder.exists():
             shutil.rmtree(folder)

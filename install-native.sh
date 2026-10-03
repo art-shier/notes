@@ -19,7 +19,7 @@ root_directory_chain() {
     if [[ -e $check ]]; then
       [[ -d $check && $(stat -c %u -- "$check") == 0 ]] || die '程序、配置及目录祖先必须属于root。'
       mode=$(stat -c %a -- "$check")
-      (( (8#$mode & 022) == 0 )) || die '程序、配置及目录祖先不能允许组或其他用户写入。'
+      (( (8#$mode & 022) == 0 )) || die "程序、配置及目录祖先不能允许组或其他用户写入：$check（权限$mode）。"
     fi
     [[ $check != / ]] || break
     check=$(dirname -- "$check")
