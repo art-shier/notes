@@ -14,7 +14,7 @@
 
 - application notes；container/host端口8000、127.0.0.1；readiness /api/v1/health/ready。
 - Dockerfile notes-server-go/Dockerfile、context根目录；保留现有生产构建、Go/Web与Agent API。
-- required_config声明DATABASE_URL、APP_ORIGIN、COOKIE_SECURE，不保存实际生产值。
+- 后续required_config仅声明DATABASE_URL；生产镜像默认APP_ORIGIN=https://notes.shier.art、COOKIE_SECURE=true，允许配置覆盖，不保存生产凭据。
 - ConfigHub沿用shier/prod；notes库与专用账号不重新创建，不连接生产DB做准备验证。
 - 不手写标准包四文件，不虚构digest或包链接；不为绕过平台校验编辑生成的Compose。
 - 最初仅授权项目接入；随后用户明确授权发布v0.2.0，已推送标签并发布标准包及镜像。生产服务器操作尚未授权或提供目标。
@@ -48,3 +48,5 @@ deployctl init/validate（1.2.0）退出0；Go test ./... -count=1全部8包通�
 
 
 本次补齐：标准workflow已放到.github/workflows；原生workflow改手动，原生installer筛选对应架构运行包。prepare.sh从ConfigHub生成raw容器配置并用真实digest镜像预检，失败保留配置。deployctl公开后已移除平台只读Token要求。用户随后授权发布，v0.2.0工作流37603131644成功，包与镜像摘要见OPERATIONS.md；另发布源提交a32f757的配置工具小包，默认notes.shier.art，无需clone。默认域名提交的完整CI37604263584通过。尚未操作生产服务器；匿名镜像拉取返回401，已请求用户设置Packages Public。
+
+后续用户要求按ctl新规范调整：平台构建工具更新至v1.5.0实际发布提交803ee2e。核对并实际复现配置校验先于pre-install、快照不可修改的顺序，首次ConfigHub自动配置方案仍待确定，未声明未实现的hooks。用户进一步要求默认配置不必填，已将生产域名和Cookie默认值加入Dockerfile、required_config保留DATABASE_URL；Go配置测试、CLI契约与测试包往返校验、actionlint及独立审查通过。此调整尚未发布新版本，v0.2.0不变。

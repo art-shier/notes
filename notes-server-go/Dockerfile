@@ -32,5 +32,6 @@ COPY --from=web /web/dist /app/web
 RUN mkdir -p /data/attachments /data/exports && chown -R notes:notes /data /app
 USER notes
 ENV WEB_DIR=/app/web ATTACHMENTS_DIR=/data/attachments EXPORTS_DIR=/data/exports LISTEN_ADDR=0.0.0.0:8000
+ENV APP_ORIGIN=https://notes.shier.art COOKIE_SECURE=true
 EXPOSE 8000
 CMD ["sh", "-c", "shiji migrate && exec shiji serve"]

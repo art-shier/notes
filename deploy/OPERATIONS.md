@@ -4,9 +4,11 @@ application为notes，默认环境prod，主机127.0.0.1:8000，就绪接口 `/a
 
 ## 已发布版本与后续发布
 
-notes自己的 `.github/workflows/release.yml` 完成测试、双架构镜像构建与标准包生成。平台工具固定到公开deployctl仓库的v1.2.0提交 `2d3a014a7b5015051a871664c1f4c2cfab2a6566`，无需 `PLATFORM_READ_TOKEN`。镜像与Release发布使用GitHub Actions自动提供的 `GITHUB_TOKEN`。
+notes自己的 `.github/workflows/release.yml` 完成测试、双架构镜像构建与标准包生成。后续构建的平台工具固定到公开deployctl仓库的v1.5.0提交 `803ee2ee974cc1818d84682b2ada84fb19a0ab94`，无需 `PLATFORM_READ_TOKEN`。镜像与Release发布使用GitHub Actions自动提供的 `GITHUB_TOKEN`。
 
 v0.2.0已发布，标准包内四文件由deployctl生成。发布提交为 `35ff869f089c11db4ba02f0b818f9641b0169d35`；随后单独发布配置工具，源提交 `a32f7574bc60d9fac3469c0a7974a83c2f4b1668`，包括默认域名修改。配置工具为Release附加资产，与标准包分开，不手改Compose。
+
+后续镜像已在源码中加入生产默认值 `APP_ORIGIN=https://notes.shier.art`、`COOKIE_SECURE=true`，部署契约只要求 `DATABASE_URL`；其他域名用 `--env-var APP_ORIGIN=https://你的域名` 覆盖。已发布的v0.2.0保持原内容，仍需准备脚本生成三项配置。新默认值需要发布新版本后才能用于服务器部署，完整hooks接入尚未完成。
 
 | 产物 | 地址 / 摘要 |
 |---|---|

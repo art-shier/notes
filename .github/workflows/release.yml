@@ -19,7 +19,7 @@ permissions:
 env:
   RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
   PLATFORM_REPOSITORY: art-shier/deployctl
-  PLATFORM_REF: 2d3a014a7b5015051a871664c1f4c2cfab2a6566
+  PLATFORM_REF: 803ee2ee974cc1818d84682b2ada84fb19a0ab94
 
 jobs:
   release:

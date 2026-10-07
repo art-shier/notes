@@ -15,5 +15,3 @@ resources:
   cpus: 1.0
 required_config:
 - DATABASE_URL
-- APP_ORIGIN
-- COOKIE_SECURE

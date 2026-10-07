@@ -2,9 +2,9 @@
 
 application 为 `notes`；HTTP 端口8000，就绪接口 `/api/v1/health/ready`。复用 Go/Web Dockerfile、外部 PostgreSQL和现有HTTPS反向代理。主机默认只绑定127.0.0.1。
 
-流水线由notes仓库自己的YAML定义，通过checkout获取公开的 `art-shier/deployctl` v1.2.0 对应审核提交 `2d3a014a7b5015051a871664c1f4c2cfab2a6566`，用于契约校验和生成标准包。使用项目标签作为version。项目测试在Dockerfile中的Node22/Go1.26测试阶段执行，不依赖Runner默认Go/Node版本。
+流水线由notes仓库自己的YAML定义，通过checkout获取公开的 `art-shier/deployctl` v1.5.0 对应提交 `803ee2ee974cc1818d84682b2ada84fb19a0ab94`，用于契约校验和生成标准包。使用项目标签作为version。项目测试在Dockerfile中的Node22/Go1.26测试阶段执行，不依赖Runner默认Go/Node版本。
 
-`deployment.yaml` 已由deployctl1.2.0 init生成并通过validate。必需变量为 `DATABASE_URL`、`APP_ORIGIN`、`COOKIE_SECURE`；密码只写在部署服务器私有配置文件中，不进入Git或发布包。沿用ConfigHub的 `shier/prod`、独立 `notes` 数据库和笔记专用账号。
+`deployment.yaml` 的必需变量为 `DATABASE_URL`。生产镜像默认 `APP_ORIGIN=https://notes.shier.art`、`COOKIE_SECURE=true`，无需额外填写；可以通过服务器配置或ctl的 `--env-var` 覆盖。密码只写在服务器私有配置中，不进入Git或发布包。沿用ConfigHub的 `shier/prod`、独立 `notes` 数据库和笔记专用账号。
 
 ## 发布与服务器步骤
 

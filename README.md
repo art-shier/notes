@@ -12,6 +12,8 @@ notes自己的发布流水线负责测试、Docker镜像构建与标准包生成
 
 部署入口默认域名为 `notes.shier.art`，可通过 `--domain` 覆盖。DNS需指向部署服务器；deployctl方式的HTTPS反向代理需在服务器另行配置。
 
+后续镜像已配置默认 `APP_ORIGIN=https://notes.shier.art`、`COOKIE_SECURE=true`，只将 `DATABASE_URL` 声明为必需配置；可用ctl的 `--env-var` 覆盖默认值。此调整尚未发布，已发布v0.2.0仍使用上面的配置工具准备完整配置。
+
 ## 原生一行部署（无需 Docker）
 
 适用于 Linux + systemd，支持 amd64/arm64。下载编译好的 Go/Web，通过 ConfigHub 连接已有 PostgreSQL；服务器不需要 Go、Node、Python 或 Docker。
