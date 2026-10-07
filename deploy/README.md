@@ -8,7 +8,7 @@ application 为 `notes`；HTTP 端口8000，就绪接口 `/api/v1/health/ready`�
 
 ## 发布与服务器步骤
 
-notes自己的 `.github/workflows/release.yml` 已接入，原生构建改为独立的手动工作流。尚未发布新的标准部署包；发布流水线成功完成构建后才能取得真实部署产物。
+notes自己的 `.github/workflows/release.yml` 已接入，原生构建改为独立的手动工作流。标准部署包v0.2.0已发布，另附独立配置工具小包；真实下载地址、摘要与无需clone的步骤见 [OPERATIONS.md](OPERATIONS.md)。
 
 用户已决定暂缓图片持久化，后续可能接OSS。当前图片/导出在容器可写层，升级或重建可能丢失；不手改标准Compose绕过契约校验。具体发布、ConfigHub准备、安装与账户步骤见 [OPERATIONS.md](OPERATIONS.md)。
 
@@ -18,4 +18,4 @@ notes自己的 `.github/workflows/release.yml` 已接入，原生构建改为独
 
 启动前执行prepare.sh，保留字段回退、URI编码、固定目标、只读预检和失败保留；生成容器适用的raw env，而不是复用旧的带引号.env或原生宿主机配置。
 
-原生与旧Compose安装入口继续可用。此前接入提交的Linux CI已通过真实Docker构建、发布测试阶段、PostgreSQL与ConfigHub启动检查；尚未发布标准部署包或执行生产服务器部署。
+原生与旧Compose安装入口继续可用。Linux CI已通过真实Docker构建、发布测试阶段、PostgreSQL与ConfigHub启动检查。v0.2.0发布流水线成功，标准包与配置工具匿名下载和校验已通过；尚未执行生产服务器部署，镜像拉取权限需在服务器确认。

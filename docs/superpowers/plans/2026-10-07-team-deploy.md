@@ -17,7 +17,7 @@
 - required_config声明DATABASE_URL、APP_ORIGIN、COOKIE_SECURE，不保存实际生产值。
 - ConfigHub沿用shier/prod；notes库与专用账号不重新创建，不连接生产DB做准备验证。
 - 不手写标准包四文件，不虚构digest或包链接；不为绕过平台校验编辑生成的Compose。
-- 不推送发布标签、不发布新版本、不操作生产服务器；项目接入与实际发布/部署授权分开。
+- 最初仅授权项目接入；随后用户明确授权发布v0.2.0，已推送标签并发布标准包及镜像。生产服务器操作尚未授权或提供目标。
 - 用户明确选择notes自有流水线；后来主动将deployctl设为公开，已验证固定审核提交可匿名下载，改为无需PLATFORM_READ_TOKEN的checkout。
 - v1协议无volumes。用户明确暂缓持久化，图片/导出在容器重建时可能丢失，文档说明边界，后续再接OSS。
 
@@ -36,7 +36,8 @@
 - [x] 按用户澄清改为项目自有完整流水线，平台工具checkout固定经审查SHA；两仓库可见性保持不变。
 - [x] 接入ConfigHub到私有config.env/secrets.env，在控制器执行前完成配置校验与DB只读预检。
 - [x] 整理原生与标准workflow的发布策略，避免Release碰撞和原生installer误选不含native资产的版本。
-- [ ] 在Linux CI验证镜像和数据库兼容；获得发布/服务器授权后验证真实发布包SHA/digest与Team Deploy安装升级回滚。附件持久性暂缓。
+- [x] Linux CI镜像、数据库及默认域名检查通过；用户授权发布v0.2.0后标准包与配置工具已真实发布，匿名下载/SHA256/包契约通过。
+- [ ] 服务器安装升级回滚及就绪验收；镜像匿名拉取目前返回401，需配置Packages可见性或拉取认证。附件持久性暂缓。
 - [x] 更新README、配置准备入口与运维说明；真实标准发布及服务器部署尚待后续授权和配置。
 
 ## 准备验证记录
@@ -46,4 +47,4 @@ deployctl init/validate（1.2.0）退出0；Go test ./... -count=1全部8包通�
 用户澄清后已将草稿改为notes自有完整YAML，actionlint1.7.7与deployctl validate退出0。接入提交a3e88ec的全部CI检查通过（37596657845），包含真实Docker构建及Linux集成检查；尚未发布标准部署包。
 
 
-本次补齐：标准workflow已放到.github/workflows；原生workflow改手动，原生installer筛选对应架构运行包。prepare.sh从ConfigHub生成raw容器配置并用真实digest镜像预检，失败保留配置。新增回归已通过。用户现将deployctl公开，已移除平台只读Token要求；仍待实际标准Release及目标服务器部署。
+本次补齐：标准workflow已放到.github/workflows；原生workflow改手动，原生installer筛选对应架构运行包。prepare.sh从ConfigHub生成raw容器配置并用真实digest镜像预检，失败保留配置。deployctl公开后已移除平台只读Token要求。用户随后授权发布，v0.2.0工作流37603131644成功，包与镜像摘要见OPERATIONS.md；另发布源提交a32f757的配置工具小包，默认notes.shier.art，无需clone。默认域名提交的完整CI37604263584通过。尚未操作生产服务器；匿名镜像拉取返回401，已请求用户设置Packages Public。

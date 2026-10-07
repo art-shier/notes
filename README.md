@@ -6,7 +6,7 @@
 
 ## deployctl 标准部署
 
-notes自己的发布流水线负责测试、Docker镜像构建与标准包生成，服务器使用deployctl安装/升级。deployctl仓库现已公开，流水线读取固定审核提交的打包工具，无需配置 `PLATFORM_READ_TOKEN`；当前尚未发布新的标准部署包。启动前通过 `deploy/prepare.sh` 从ConfigHub的shier/prod生成私有raw配置并做只读数据库预检，库名默认为notes。
+notes自己的发布流水线负责测试、Docker镜像构建与标准包生成，服务器使用deployctl安装/升级。deployctl仓库现已公开，流水线读取固定审核提交的打包工具，无需配置 `PLATFORM_READ_TOKEN`。[v0.2.0标准部署包](https://github.com/art-shier/notes/releases/tag/v0.2.0)已发布，包含amd64/arm64镜像及SHA256校验。Release另提供独立配置工具小包，服务器无需clone源码；工具从ConfigHub的shier/prod生成私有raw配置并做只读数据库预检，库名默认为notes。服务器需具备GHCR镜像拉取权限，或将镜像设为Public。
 
 图片持久化按当前决定暂缓，升级或重建可能丢失本地图片/导出，后续再接OSS。发布、配置、安装与当前验证边界见 [deployctl部署指南](deploy/OPERATIONS.md)。
 
