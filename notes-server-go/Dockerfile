@@ -5,12 +5,18 @@ RUN npm ci
 COPY notes-web/ ./
 RUN npm run build
 
+FROM web AS web-test
+RUN npm test
+
 FROM golang:1.26-bookworm AS server
 WORKDIR /src
 COPY notes-server-go/go.mod notes-server-go/go.sum ./
 RUN go mod download
 COPY notes-server-go/ ./
 RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /shiji ./cmd/shiji
+
+FROM server AS server-test
+RUN go test -race ./... && go vet ./...
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \

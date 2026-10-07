@@ -1,0 +1,19 @@
+name: Project release
+'on':
+  push:
+    tags:
+    - v*
+permissions:
+  contents: write
+  packages: write
+jobs:
+  release:
+    uses: art-shier/deployctl/.github/workflows/build-release.yml@2d3a014a7b5015051a871664c1f4c2cfab2a6566
+    with:
+      platform-repository: art-shier/deployctl
+      platform-ref: 2d3a014a7b5015051a871664c1f4c2cfab2a6566
+      deployment-file: deploy/deployment.yaml
+      version: ${{ github.ref_name }}
+      test-command: bash notes-server-go/ops/test-release.sh
+    secrets:
+      PLATFORM_READ_TOKEN: ${{ secrets.PLATFORM_READ_TOKEN }}
