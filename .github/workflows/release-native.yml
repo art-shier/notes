@@ -1,0 +1,46 @@
+name: Native release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing project tag to build native binaries for
+        type: string
+        required: true
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.version }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: notes-server-go/go.mod
+          cache-dependency-path: notes-server-go/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: notes-web/package-lock.json
+      - name: Validate and build release
+        env:
+          NATIVE_VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$NATIVE_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git show-ref --verify --quiet "refs/tags/$NATIVE_VERSION"
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse "refs/tags/$NATIVE_VERSION^{commit}")" ]]
+          go -C notes-server-go test ./...
+          go -C notes-server-go vet ./...
+          bash notes-server-go/ops/build-native.sh "${NATIVE_VERSION#v}" "$RUNNER_TEMP/notes-release"
+      - name: Publish checksummed native runtime packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NATIVE_VERSION: ${{ inputs.version }}
+        run: |
+          if gh release view "$NATIVE_VERSION" >/dev/null 2>&1; then
+            gh release upload "$NATIVE_VERSION" "$RUNNER_TEMP/notes-release/"*.tar.gz "$RUNNER_TEMP/notes-release/checksums.txt"
+          else
+            gh release create "$NATIVE_VERSION" "$RUNNER_TEMP/notes-release/"*.tar.gz "$RUNNER_TEMP/notes-release/checksums.txt" --verify-tag --title "Notes $NATIVE_VERSION" --generate-notes
+          fi

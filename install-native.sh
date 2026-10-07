@@ -109,9 +109,11 @@ if $initial; then
   if getent passwd "$service" >/dev/null; then die '同名OS账号已存在，请使用独立 --service-name。';fi
 fi
 stage=$(mktemp -d /tmp/notes-native-install.XXXXXX)
-if [[ -z $version ]]; then version=$(curl --fail --silent --show-error --proto '=https' https://api.github.com/repos/art-shier/notes/releases/latest | jq -er .tag_name);fi
-[[ $version =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]] || die 'Release版本格式无效。'
 case $(uname -m) in x86_64|amd64) arch=amd64;; aarch64|arm64) arch=arm64;; *) die '只支持Linux amd64/arm64。';;esac
+if [[ -z $version ]]; then
+  version=$(curl --fail --silent --show-error --proto '=https' 'https://api.github.com/repos/art-shier/notes/releases?per_page=100' | jq -er --arg arch "$arch" 'first(.[] | select(.draft == false and .prerelease == false) | . as $r | select(any(.assets[]; .name == ("notes-server_" + ($r.tag_name | ltrimstr("v")) + "_linux_" + $arch + ".tar.gz"))) | .tag_name)')
+fi
+[[ $version =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]] || die 'Release版本格式无效。'
 name="notes-server_${version#v}_linux_${arch}.tar.gz"
 if [[ -n $artifact ]]; then
   plain_path "$artifact";plain_path "$checksum_file"

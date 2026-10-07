@@ -28,3 +28,8 @@ notes-mobile-web.html
 **/.config-tmp.*/
 **/.tools/
 **/.confighub.yaml
+**/config.env
+**/secrets.env
+**/.notes-team.json
+**/.notes-prepare.*
+**/.notes-prepare.lock/

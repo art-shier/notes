@@ -1,5 +1,7 @@
 # 部署脚本测试
 
+`python3 tests/team_config_test.py` 验证 deployctl 的 ConfigHub 准备流程：raw 容器配置、URI 编码、秘密隔离、指定 digest 镜像的数据库预检、域名/数据库目标锁定、密码轮换，以及拉取、预检和部分配置发布失败时保留全部旧文件。使用临时目录与模拟 CLI/Docker，不访问生产服务。
+
 `python3 tests/native_config_test.py` 验证原生配置读取、私有 env、URI编码、环境隔离、密码轮换、失败保留及固定目标。`python3 tests/native_install_test.py` 使用临时目录与模拟系统边界验证 Linux/root、参数、受保护的独立目录、坏校验和危险归档。
 
 CI 的 `native-systemd` 作业编译 amd64/arm64 运行包，执行 `sudo env CI=true python3 tests/native_smoke.py 运行包目录`。使用真实 Linux systemd、随机独立非root账号、宿主机原生 Go/Web、临时 TLS PostgreSQL16；验证迁移/邀请、重复安装、600权限、失败刷新保留PID/env、模拟开机失败阻止启动后恢复。Docker 仅提供测试数据库；不会访问正式 ConfigHub 或生产数据库，仅清理随机专用单元、账号、目录及测试卷。
