@@ -10,6 +10,8 @@ notes自己的发布流水线负责测试、Docker镜像构建与标准包生成
 
 图片持久化按当前决定暂缓，升级或重建可能丢失本地图片/导出，后续再接OSS。发布、配置、安装与当前验证边界见 [deployctl部署指南](deploy/OPERATIONS.md)。
 
+部署入口默认域名为 `notes.shier.art`，可通过 `--domain` 覆盖。DNS需指向部署服务器；deployctl方式的HTTPS反向代理需在服务器另行配置。
+
 ## 原生一行部署（无需 Docker）
 
 适用于 Linux + systemd，支持 amd64/arm64。下载编译好的 Go/Web，通过 ConfigHub 连接已有 PostgreSQL；服务器不需要 Go、Node、Python 或 Docker。
@@ -17,7 +19,7 @@ notes自己的发布流水线负责测试、Docker镜像构建与标准包生成
 将 ConfigHub Token 安全上传至服务器 `/root/shier-prod.token`，设为 root 所有、权限600；默认读取 `https://config.shier.art` 的 `shier/prod`，数据库为 `notes`。主机/端口沿用 `db_address`、`db_port`，使用笔记专用 `notes_db_username`、`notes_db_password`。Windows 的 CLI 配置不会自动同步到服务器。
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install-native.sh | sudo bash -s -- --domain notes.example.com --email you@example.com --token-file /root/shier-prod.token
+curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install-native.sh | sudo bash -s -- --domain notes.shier.art --email you@example.com --token-file /root/shier-prod.token
 ```
 
 替换域名和邮箱。脚本验证 Release SHA-256，安装或复用 ConfigHub CLI，创建专用 OS 账号，拉取及预检数据库配置，生成私有配置，迁移并启动 systemd 服务，最后输出管理员邀请。默认程序 `/opt/shiji`、配置 `/etc/shiji`、附件与导出 `/var/lib/shiji`；已有数据和账户保留。Debian/Ubuntu 自动安装缺少的 curl/jq/tar/util-linux。
@@ -42,7 +44,7 @@ sudo systemctl restart shiji.service
 替换域名和邮箱后执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install.sh | bash -s -- --domain notes.example.com --email you@example.com
+curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install.sh | bash -s -- --domain notes.shier.art --email you@example.com
 ```
 
 脚本下载项目到当前用户的 `~/notes`，生成独立随机数据库密码，构建并启动 PostgreSQL、Go/Web、Caddy，等待数据库和 HTTPS 就绪，最后输出 **24小时有效的管理员邀请链接**。打开链接自行设置密码，没有默认密码或公开注册。系统依赖安装及 Docker 权限可能要求 sudo。
@@ -52,7 +54,7 @@ curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install.sh | b
 可在上述命令末尾的 `--email ...` 后追加 `--dir /srv/notes --project shiji`，指定安装位置和独立项目名：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install.sh | bash -s -- --domain notes.example.com --email you@example.com --dir /srv/notes --project shiji
+curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install.sh | bash -s -- --domain notes.shier.art --email you@example.com --dir /srv/notes --project shiji
 ```
 
 重复执行会保留已有配置、密码和数据，也不会自动更新已有 Git 代码。输入域名与已有配置不同会拒绝；已有非本项目目录不会覆盖；失败不会自动删除持久卷。若安装进程被强制终止，确认没有其他安装运行后再移除 `notes-server-go/.install.lock` 目录。
@@ -66,7 +68,7 @@ curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install.sh | b
 在**实际部署服务器**配置 CLI 的 Token，或准备一个只有运行用户可读的 Token 文件（Linux权限600）。本机 Windows 的 CLI 配置不会自动同步到服务器。然后替换域名和邮箱执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install.sh | bash -s -- --domain notes.example.com --email you@example.com --config-hub --config-hub-project shier --config-hub-env prod --database-name notes --token-file /private/shier-prod.token
+curl -fsSL https://raw.githubusercontent.com/art-shier/notes/main/install.sh | bash -s -- --domain notes.shier.art --email you@example.com --config-hub --config-hub-project shier --config-hub-env prod --database-name notes --token-file /private/shier-prod.token
 ```
 
 安装器复用已安装的 ConfigHub CLI；缺少时从其官方 Release 安装并校验 SHA-256，放在项目 `.tools` 目录。服务器已有全局 CLI Token 时可省略 `--token-file`。ConfigHub URL 默认 `https://config.shier.art`，可通过 `--config-hub-url` 指定其他 HTTPS 服务。
@@ -102,7 +104,7 @@ sudo bash ops/backup.sh /srv/shiji-backups/新的备份目录
 git -C .. pull --ff-only
 docker compose build --pull app
 bash ops/start.sh
-bash ops/check.sh https://notes.example.com
+bash ops/check.sh https://notes.shier.art
 ```
 
 备份目标目录必须不存在。恢复只允许独立空环境；详情见 [部署与恢复指南](notes-deployment-guide.md)。
@@ -148,5 +150,5 @@ NOTES_API_TOKEN=从笔记网页创建的个人访问Token
 私有仓库副本可通过API下载脚本并使用临时Token克隆（Token只用于认证，不写入Git远程地址或配置）：
 
 ```bash
-read -rsp 'GitHub Token: ' GITHUB_TOKEN; echo; export GITHUB_TOKEN; (set -o pipefail; curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H 'Accept: application/vnd.github.raw+json' 'https://api.github.com/repos/art-shier/notes/contents/install.sh?ref=main' | bash -s -- --domain notes.example.com --email you@example.com); unset GITHUB_TOKEN
+read -rsp 'GitHub Token: ' GITHUB_TOKEN; echo; export GITHUB_TOKEN; (set -o pipefail; curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H 'Accept: application/vnd.github.raw+json' 'https://api.github.com/repos/art-shier/notes/contents/install.sh?ref=main' | bash -s -- --domain notes.shier.art --email you@example.com); unset GITHUB_TOKEN
 ```

@@ -5,7 +5,7 @@ umask 077
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
 source "$root/notes-server-go/ops/config-hub-lib.sh"
 source "$root/notes-server-go/ops/native/lib.sh"
-domain='' image='' environment=prod config_root=/etc/deployctl
+domain=notes.shier.art image='' environment=prod config_root=/etc/deployctl
 hub_url=https://config.shier.art hub_project=shier hub_env=prod database=notes
 cli='' token_file='' stage='' lock='' publishing=false
 cleanup() {

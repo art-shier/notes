@@ -37,7 +37,7 @@ if [[ ${TEST_DB_FAIL:-0} == 1 ]];then echo 'sensitive-db-error' >&2;exit 8;fi
     for name,body in scripts.items():
         p=bins/name;p.write_text('#!/usr/bin/env bash\n'+body,encoding='utf-8',newline='\n');p.chmod(0o755)
     image='ghcr.io/example/fixture@sha256:'+'0'*64  # Test fixture, never published.
-    args=['--domain','notes.example.com','--image',image,'--config-root',path(cfg),'--cli-binary',path(bins/'confighub')]
+    args=['--image',image,'--config-root',path(cfg),'--cli-binary',path(bins/'confighub')]
     def run(*extra,**overrides):
         env={**os.environ,'TEST_BIN':str(bins).replace('\\','/'),'TEST_VALUES':str(values).replace('\\','/'),'TEST_LOG':str(log).replace('\\','/'),**overrides}
         script=('export PATH="$(cygpath -u "$TEST_BIN"):$PATH"; ' if os.name=='nt' else 'export PATH="$TEST_BIN:$PATH"; ')+'exec bash "$@"'
@@ -46,6 +46,7 @@ if [[ ${TEST_DB_FAIL:-0} == 1 ]];then echo 'sensitive-db-error' >&2;exit 8;fi
     target=cfg/'notes/prod';files=['config.env','secrets.env','.notes-team.json','.database-target']
     before={n:(target/n).read_bytes() for n in files}
     assert b'COOKIE_SECURE=true' in before['config.env'] and b'WEB_DIR=/app/web' in before['config.env']
+    assert b'APP_ORIGIN=https://notes.shier.art\n' in before['config.env']
     assert b's%20ecret%27%24%28touch%20PWNED%29%0Anext' in before['secrets.env']
     assert b'never-export' not in before['secrets.env'] and not (base/'PWNED').exists()
     for overrides in [{'TEST_FETCH_FAIL':'1'},{'TEST_DB_FAIL':'1'}]:

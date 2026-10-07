@@ -1,6 +1,6 @@
 # Notes：deployctl 部署
 
-application为notes，默认环境prod，主机127.0.0.1:8000，就绪接口 `/api/v1/health/ready`。Go/Web使用现有Dockerfile；PostgreSQL与HTTPS代理外置。
+application为notes，默认环境prod，主机127.0.0.1:8000，就绪接口 `/api/v1/health/ready`。默认域名为 `notes.shier.art`，可通过 `--domain` 覆盖。Go/Web使用现有Dockerfile；PostgreSQL与HTTPS代理外置。
 
 ## 先发布真实部署包
 
@@ -18,7 +18,7 @@ notes自己的 `.github/workflows/release.yml` 完成测试、双架构镜像构
 
 ```bash
 # IMAGE必须为实际发布的ghcr.io/art-shier/notes@sha256:...，不使用latest
-sudo bash deploy/prepare.sh --domain notes.example.com --image "$IMAGE" --token-file /root/shier-prod.token
+sudo bash deploy/prepare.sh --domain notes.shier.art --image "$IMAGE" --token-file /root/shier-prod.token
 ```
 
 准备脚本先拉取/校验/URI编码，再用指定镜像执行只读database-check，成功后生成 `/etc/deployctl/notes/prod/config.env`、secrets.env（600、raw、不加shell引号）。使用0.0.0.0:8000及/app、/data容器路径；失败保留原配置，域名/配置来源/数据库目标锁定，密码可经检查更新。它不安装/重启服务、不创建数据库、不输出凭据。

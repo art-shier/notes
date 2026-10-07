@@ -2,7 +2,7 @@
 # Native Linux deployment using a checksummed release, systemd and external PG.
 set -Eeuo pipefail
 umask 077
-domain='' email='' version='' artifact='' checksum_file='' port=8000 service=shiji
+domain=notes.shier.art email='' version='' artifact='' checksum_file='' port=8000 service=shiji
 install_dir=/opt/shiji config_dir=/etc/shiji data_dir=/var/lib/shiji unit_dir=/etc/systemd/system
 hub_url=https://config.shier.art hub_project=shier hub_env=prod database=notes token_file='' cli=''
 skip_dependencies=false stage='' lock='' link_tmp=''
@@ -60,7 +60,7 @@ trap cleanup EXIT
 while (($#)); do
   case $1 in
     --skip-dependencies) skip_dependencies=true;shift;;
-    --help|-h) echo 'Usage: sudo bash install-native.sh --domain notes.example.com --email admin@example.com [--token-file /private/token] [--port 8000] [--version v0.1.0]';exit;;
+    --help|-h) echo 'Usage: sudo bash install-native.sh --email admin@example.com [--domain notes.shier.art] [--token-file /private/token] [--port 8000] [--version v0.1.0]';exit;;
     --domain|--email|--version|--artifact|--checksum-file|--port|--service-name|--install-dir|--config-dir|--data-dir|--unit-dir|--config-hub-url|--config-hub-project|--config-hub-env|--database-name|--token-file|--cli-binary)
       (($#>=2)) || die '缺少参数值。'
       case $1 in

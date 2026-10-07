@@ -4,7 +4,7 @@ set -Eeuo pipefail
 umask 077
 unset DATABASE_URL DOMAIN COMPOSE_FILE COMPOSE_PROJECT_NAME COMPOSE_ENV_FILES COMPOSE_PROFILES POSTGRES_PASSWORD NOTE_HISTORY_LIMIT EXPORT_LIMIT_BYTES
 REPO=https://github.com/art-shier/notes.git
-DOMAIN='' ADMIN_EMAIL='' INSTALL_DIR="${HOME}/notes" PROJECT=shiji
+DOMAIN=notes.shier.art ADMIN_EMAIL='' INSTALL_DIR="${HOME}/notes" PROJECT=shiji
 CONFIG_HUB=false HUB_URL=https://config.shier.art HUB_PROJECT='' HUB_ENV='' DATABASE_NAME='' TOKEN_FILE=''
 HUB_URL_SET=false
 lock='' env_tmp='' askpass='' cli_setup=''
@@ -12,7 +12,7 @@ say() { printf '\n[拾记] %s\n' "$*"; }
 die() { printf '\n[拾记] %s\n' "$*" >&2; exit 1; }
 usage() {
   cat <<'HELP'
-Usage: bash install.sh --domain notes.example.com --email admin@example.com [--dir /path/notes] [--project shiji]
+Usage: bash install.sh --email admin@example.com [--domain notes.shier.art] [--dir /path/notes] [--project shiji]
 External database: add --config-hub --config-hub-project shier --config-hub-env prod [--database-name notes] [--token-file /private/token]
 Linux server; domain must resolve to this server, TCP 80/443 must be available.
 Existing configuration and persistent Docker volumes are preserved.
