@@ -4,7 +4,7 @@ application为notes，默认环境prod，主机127.0.0.1:8000，就绪接口 `/a
 
 ## 先发布真实部署包
 
-notes自己的 `.github/workflows/release.yml` 完成测试、双架构镜像构建与标准包生成。平台工具固定到deployctl v1.2.0提交 `2d3a014a7b5015051a871664c1f4c2cfab2a6566`；notes的Actions Secrets需要 `PLATFORM_READ_TOKEN`，仅授权读取该私有仓库。两仓库可见性不变。
+notes自己的 `.github/workflows/release.yml` 完成测试、双架构镜像构建与标准包生成。平台工具固定到公开deployctl仓库的v1.2.0提交 `2d3a014a7b5015051a871664c1f4c2cfab2a6566`，无需 `PLATFORM_READ_TOKEN`。镜像与Release发布使用GitHub Actions自动提供的 `GITHUB_TOKEN`。
 
 新增v*标签或手动选择已有未发布标签可触发发布，需先取得相应发布授权。发布成功后在Actions输出查看真实image digest、包URL与SHA256。包内四文件由deployctl生成，不手工改Compose。当前尚未发布新的标准部署包，不把示例版本/地址当作已有产物。
 

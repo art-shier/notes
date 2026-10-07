@@ -6,7 +6,7 @@
 
 ## deployctl 标准部署
 
-notes自己的发布流水线负责测试、Docker镜像构建与标准包生成，服务器使用deployctl安装/升级。流程配置已接入，实际发布需要仓库Secret `PLATFORM_READ_TOKEN`；当前尚未发布新的标准部署包。启动前通过 `deploy/prepare.sh` 从ConfigHub的shier/prod生成私有raw配置并做只读数据库预检，库名默认为notes。
+notes自己的发布流水线负责测试、Docker镜像构建与标准包生成，服务器使用deployctl安装/升级。deployctl仓库现已公开，流水线读取固定审核提交的打包工具，无需配置 `PLATFORM_READ_TOKEN`；当前尚未发布新的标准部署包。启动前通过 `deploy/prepare.sh` 从ConfigHub的shier/prod生成私有raw配置并做只读数据库预检，库名默认为notes。
 
 图片持久化按当前决定暂缓，升级或重建可能丢失本地图片/导出，后续再接OSS。发布、配置、安装与当前验证边界见 [deployctl部署指南](deploy/OPERATIONS.md)。
 

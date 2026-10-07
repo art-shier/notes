@@ -18,7 +18,7 @@
 - ConfigHub沿用shier/prod；notes库与专用账号不重新创建，不连接生产DB做准备验证。
 - 不手写标准包四文件，不虚构digest或包链接；不为绕过平台校验编辑生成的Compose。
 - 不推送发布标签、不发布新版本、不操作生产服务器；项目接入与实际发布/部署授权分开。
-- 用户明确选择notes自有流水线。notes公开、deployctl私有保持不变，通过PLATFORM_READ_TOKEN checkout平台工具，不调用私有reusable workflow，不需要改变仓库可见性。
+- 用户明确选择notes自有流水线；后来主动将deployctl设为公开，已验证固定审核提交可匿名下载，改为无需PLATFORM_READ_TOKEN的checkout。
 - v1协议无volumes。用户明确暂缓持久化，图片/导出在容器重建时可能丢失，文档说明边界，后续再接OSS。
 
 ## Task 1: 可审查的本地接入准备
@@ -43,7 +43,7 @@
 
 deployctl init/validate（1.2.0）退出0；Go test ./... -count=1全部8包通过；npm ci/npm test退出0，7项通过；test-release.sh Bash -n退出0。读取Github平台Release/tag/CI元数据已确认引用真实存在；未读取生产secret、调用生产ConfigHub/数据库或执行SSH。
 
-用户澄清后已将草稿改为notes自有完整YAML，actionlint1.7.7与deployctl validate退出0；此前仓库公开/私有方案问题不再需要用户选择。仍未配置平台只读Token、触发真实构建或发布。
+用户澄清后已将草稿改为notes自有完整YAML，actionlint1.7.7与deployctl validate退出0。接入提交a3e88ec的全部CI检查通过（37596657845），包含真实Docker构建及Linux集成检查；尚未发布标准部署包。
 
 
-本次补齐：标准workflow已放到.github/workflows；原生workflow改手动，原生installer筛选对应架构运行包。prepare.sh从ConfigHub生成raw容器配置并用真实digest镜像预检，失败保留配置。新增回归已通过；尚无PLATFORM_READ_TOKEN、实际标准Release或目标服务器部署。
+本次补齐：标准workflow已放到.github/workflows；原生workflow改手动，原生installer筛选对应架构运行包。prepare.sh从ConfigHub生成raw容器配置并用真实digest镜像预检，失败保留配置。新增回归已通过。用户现将deployctl公开，已移除平台只读Token要求；仍待实际标准Release及目标服务器部署。

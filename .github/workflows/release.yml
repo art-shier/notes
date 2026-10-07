@@ -1,4 +1,4 @@
-# Notes owns this workflow. The private platform supplies packaging tools only.
+# Notes owns this workflow. The public platform supplies packaging tools only.
 # Local images/exports are temporary until external storage is integrated.
 name: Notes Team Deploy release
 
@@ -32,14 +32,6 @@ jobs:
       sha256: ${{ steps.publish.outputs.sha256 }}
       image: ${{ steps.package.outputs.image }}
     steps:
-      - name: Check platform credential
-        env:
-          PLATFORM_READ_TOKEN: ${{ secrets.PLATFORM_READ_TOKEN }}
-        run: |
-          if [[ -z "$PLATFORM_READ_TOKEN" ]]; then
-            echo '::error::Configure PLATFORM_READ_TOKEN with read access to the private platform repository.'
-            exit 1
-          fi
       - uses: actions/checkout@v4
         with:
           ref: refs/tags/${{ env.RELEASE_VERSION }}
@@ -49,7 +41,6 @@ jobs:
         with:
           repository: ${{ env.PLATFORM_REPOSITORY }}
           ref: ${{ env.PLATFORM_REF }}
-          token: ${{ secrets.PLATFORM_READ_TOKEN }}
           path: platform
           persist-credentials: false
       - uses: actions/setup-python@v5
