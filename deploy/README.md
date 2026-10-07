@@ -1,21 +1,13 @@
 # Notes Team Deploy
 
-application 为 `notes`；HTTP 端口8000，就绪接口 `/api/v1/health/ready`。复用 Go/Web Dockerfile、外部 PostgreSQL和现有HTTPS反向代理。主机默认只绑定127.0.0.1。
+application为notes，主机默认127.0.0.1:8000，就绪接口 `/api/v1/health/ready`。Go/Web镜像、外部PostgreSQL及HTTPS代理。
 
-流水线由notes仓库自己的YAML定义，通过checkout获取公开的 `art-shier/deployctl` v1.5.0 对应提交 `803ee2ee974cc1818d84682b2ada84fb19a0ab94`，用于契约校验和生成标准包。使用项目标签作为version。项目测试在Dockerfile中的Node22/Go1.26测试阶段执行，不依赖Runner默认Go/Node版本。
+新版required_config为空，标准包自带pre/post脚本。pre从ConfigHub的shier/prod读取notes专用数据库账号，生成私有DATABASE_URL，采用默认域名notes.shier.art；ctl在pre后重新加载配置并创建新的不可变快照，再启动。post检查管理员状态，可通过ADMIN_EMAIL生成首个邀请。无需clone或提前执行prepare。
 
-`deployment.yaml` 的必需变量为 `DATABASE_URL`。生产镜像默认 `APP_ORIGIN=https://notes.shier.art`、`COOKIE_SECURE=true`，无需额外填写；可以通过服务器配置或ctl的 `--env-var` 覆盖。密码只写在服务器私有配置中，不进入Git或发布包。沿用ConfigHub的 `shier/prod`、独立 `notes` 数据库和笔记专用账号。
+服务器预装ConfigHub CLI，私有Token默认 `/root/shier-prod.token`（root/600）。TOKEN_FILE、DOMAIN等通过ctl的 `--set` 指定；安装参数仅本次有效，自定义值每次upgrade需重传。密码不进入Git或发布包。
 
-## 发布与服务器步骤
+需要待发布的ctl>=1.6.0及新Notes包。两个工作流固定到相同平台源码SHA；已发布v0.2.0和ctl1.5.0不能使用此新流程。真实旧版本信息与新步骤见 [OPERATIONS.md](OPERATIONS.md)。不覆盖旧Release或使用浮动镜像。
 
-notes自己的 `.github/workflows/release.yml` 已接入，原生构建改为独立的手动工作流。标准部署包v0.2.0已发布，另附独立配置工具小包；真实下载地址、摘要与无需clone的步骤见 [OPERATIONS.md](OPERATIONS.md)。
+`deploy/hooks/pre-install.sh` 由 `python3 deploy/build-hooks.py` 从prepare与共享安全函数生成；CI/release用 `--check` 检查一致性。钩子打包后不依赖源码目录。测试包含临时TLS PostgreSQL、真实ctl/Docker及失败恢复。
 
-用户已决定暂缓图片持久化，后续可能接OSS。当前图片/导出在容器可写层，升级或重建可能丢失；不手改标准Compose绕过契约校验。具体发布、ConfigHub准备、安装与账户步骤见 [OPERATIONS.md](OPERATIONS.md)。
-
-用户已将deployctl仓库设为公开，无需 `PLATFORM_READ_TOKEN`。发布镜像及Release使用GitHub Actions自动提供的 `GITHUB_TOKEN`；服务器拉取ConfigHub数据库配置仍需独立的ConfigHub凭据。
-
-标准流水线使用v*标签或手动触发，version必须是已有且尚未发布的项目标签；不要重复发布v0.1.0。构建完成才使用真实镜像digest生成标准tar.gz及相邻.sha256，四个包内文件由deployctl生成。
-
-启动前执行prepare.sh，保留字段回退、URI编码、固定目标、只读预检和失败保留；生成容器适用的raw env，而不是复用旧的带引号.env或原生宿主机配置。
-
-原生与旧Compose安装入口继续可用。Linux CI已通过真实Docker构建、发布测试阶段、PostgreSQL与ConfigHub启动检查。v0.2.0发布流水线成功，标准包与配置工具匿名下载和校验已通过；尚未执行生产服务器部署，镜像拉取权限需在服务器确认。
+图片与导出持久化按用户要求暂缓；升级或重建可能丢失，后续接OSS。HTTPS/DNS在服务器另外配置。原生与旧Compose入口保留。公开平台源码不需要PLATFORM_READ_TOKEN，GHCR镜像需要Public或服务器登录。

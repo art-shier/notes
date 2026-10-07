@@ -33,12 +33,13 @@ jobs:
           npm run build
       - name: Installer syntax and regression
         run: |
-          for script in install.sh install-native.sh install-client.sh deploy/*.sh notes-server-go/ops/*.sh notes-server-go/ops/native/*.sh; do bash -n "$script"; done
+          for script in install.sh install-native.sh install-client.sh deploy/*.sh deploy/hooks/*.sh notes-server-go/ops/*.sh notes-server-go/ops/native/*.sh; do bash -n "$script"; done
           if ! command -v jq >/dev/null; then sudo apt-get update && sudo apt-get install -y jq; fi
           python3 tests/deploy_test.py
           python3 tests/config_hub_start_test.py
           python3 tests/native_config_test.py
           python3 tests/team_config_test.py
+          python3 tests/team_hook_test.py
           python3 tests/native_install_test.py
           python3 tests/client_install_test.py
   native-systemd:
@@ -87,3 +88,17 @@ jobs:
         run: python3 tests/pg_smoke.py
       - name: Real ConfigHub startup with TLS PostgreSQL
         run: python3 tests/startup_smoke.py
+      - name: Check out exact configuration-refresh platform
+        uses: actions/checkout@v4
+        with:
+          repository: art-shier/deployctl
+          ref: 9e62828e4f2a31f1b06d9bb5a500a16baafb8609
+          path: .ci-platform
+          persist-credentials: false
+      - name: Install contract parser
+        # sudo must use this same interpreter with the installed parser.
+        run: python3 -m pip install PyYAML==6.0.3
+      - name: Standard hook package round-trip
+        run: python3 tests/team_package_test.py .ci-platform
+      - name: Real packaged hooks, ctl and TLS PostgreSQL
+        run: sudo env CI=true "$(command -v python3)" tests/team_smoke.py .ci-platform

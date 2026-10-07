@@ -9,8 +9,10 @@ domain=notes.shier.art image='' environment=prod config_root=/etc/deployctl
 hub_url=https://config.shier.art hub_project=shier hub_env=prod database=notes
 cli='' token_file='' stage='' lock='' publishing=false
 cleanup() {
-  local status=$?
-  if ((status)) && $publishing; then
+  # Incomplete publication must restore even when Bash's EXIT status is zero
+  # during signal termination. Protect cleanup against repeated TERM/HUP/INT.
+  trap '' TERM HUP INT
+  if $publishing; then
     for index in "${!destinations[@]}"; do
       if [[ -f $stage/backup-$index ]]; then cp -p -- "$stage/backup-$index" "${destinations[index]}";else rm -f -- "${destinations[index]}";fi
     done
@@ -23,6 +25,9 @@ cleanup() {
   [[ -z $lock ]] || rmdir -- "$lock"
 }
 trap cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+trap 'exit 130' INT
 while (($#)); do
   (($#>=2)) || native_die '缺少参数值。'
   case $1 in
