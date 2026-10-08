@@ -42,6 +42,9 @@ def container():
     return run(['docker','ps','-q','--filter','label=com.docker.compose.project='+app_project])
 def values():
     return json.loads(run(['docker','exec',container(),'sh','-c','cat "$DEPLOYCTL_ENV_FILE"']))
+def origin():
+    # effective.env stores supplied overrides; image defaults remain in Docker ENV.
+    return run(['docker','exec',container(),'printenv','APP_ORIGIN'])
 manager=Manager(base/'apps',base/'config')
 folder=base/'config/notes'/deploy_env
 certs=base/'certs';certs.mkdir(mode=0o755)
@@ -87,6 +90,7 @@ try:
     package=build_release(config,image,'v0.0.0-ci',base/'packages',project_root=ROOT)
     first=manager.deploy('notes',deploy_env,package,port=port,install_params=params)
     assert first['transaction'] is None and values()['DB_USER']=='notes' and 'DATABASE_URL' not in values()
+    assert 'APP_ORIGIN' not in values() and origin()=='https://notes.shier.art'
     assert run(['docker','exec',container(),'shiji','bootstrap-status'])=='empty'
     assert int(db('exec','-T','db','psql','-U','notes','-d','notes','-At','-c',"SELECT count(*) FROM pg_stat_ssl s JOIN pg_stat_activity a ON a.pid=s.pid WHERE a.datname='notes' AND s.ssl"))>0
     for file in ('config.env','secrets.env'):
@@ -107,8 +111,9 @@ try:
     second=manager.deploy('notes',deploy_env,package,upgrade=True,install_params=params,
         runtime_env={'APP_ORIGIN':'https://override.example.test'})
     assert second['previous']==first['current'] and values()['APP_ORIGIN']=='https://override.example.test'
+    assert origin()=='https://override.example.test'
     manager.rollback('notes',deploy_env)
-    assert values()['APP_ORIGIN']=='https://notes.shier.art'
+    assert 'APP_ORIGIN' not in values() and origin()=='https://notes.shier.art'
     # A real failing post hook must restore the old successful runtime.
     failing=copy.deepcopy(config);failing['hooks']['post_install']['script']='post-fail.sh'
     (base/'post-fail.sh').write_text('exit 7\n')
@@ -126,7 +131,7 @@ try:
     assert diagnostic['phase']=='post_install' and diagnostic['version']=='v0.0.1-ci'
     current=json.loads((base/'apps/notes'/deploy_env/'state.json').read_text())
     assert current['transaction'] is None and current['current']==first['current']
-    assert values()['APP_ORIGIN']=='https://notes.shier.art'
+    assert 'APP_ORIGIN' not in values() and origin()=='https://notes.shier.art'
     # Bootstrap uses effective overrides, then preserves the pending invitation.
     manager.deploy('notes',deploy_env,package,upgrade=True,install_params={**params,'ADMIN_EMAIL':'ci@example.test'})
     assert run(['docker','exec',container(),'shiji','bootstrap-status'])=='pending'
