@@ -20,8 +20,8 @@ env:
   RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
   PLATFORM_REPOSITORY: art-shier/deployctl
   PLATFORM_REF: 36faf3e5440e75b6bdff88d6460c128f8f3ec13e
-  CTL_SERVER_URL: ${{ vars.CTL_SERVER_URL }}
-  CTL_REGISTRY_HOST: ${{ vars.CTL_REGISTRY_HOST }}
+  CTL_SERVER_URL: ${{ vars.CTL_SERVER_URL || 'https://ctl.shier.art' }}
+  CTL_REGISTRY_HOST: ${{ vars.CTL_REGISTRY_HOST || 'ctl.shier.art' }}
 
 jobs:
   release:
@@ -89,6 +89,15 @@ jobs:
           PY
           git show-ref --verify --quiet "refs/tags/$RELEASE_VERSION"
           [[ "$(git rev-parse HEAD)" == "$(git rev-parse "refs/tags/$RELEASE_VERSION^{commit}")" ]]
+      - name: Check ctl publisher credential
+        if: env.CTL_SERVER_URL != ''
+        env:
+          CTL_PUBLISH_TOKEN: ${{ secrets.CTL_PUBLISH_TOKEN }}
+        run: |
+          if [[ -z "$CTL_PUBLISH_TOKEN" ]]; then
+            echo '::error::Set the CTL_PUBLISH_TOKEN repository secret to a Notes publisher token from ctl.'
+            exit 1
+          fi
       - name: Require an unpublished version
         if: env.CTL_SERVER_URL == ''
         working-directory: source

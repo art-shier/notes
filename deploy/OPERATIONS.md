@@ -33,7 +33,7 @@ ctl和Notes新版尚未发布；下面的v0.2.0步骤仍是旧版本的真实可
 
 ## 已发布版本与后续发布
 
-notes自己的 `.github/workflows/release.yml` 完成测试、双架构镜像构建与标准包生成。新版构建与CI使用工作流中固定的配置回读平台源码SHA，无需 `PLATFORM_READ_TOKEN`。镜像与Release发布使用GitHub Actions自动提供的 `GITHUB_TOKEN`。
+notes自己的 `.github/workflows/release.yml` 完成测试、双架构镜像构建与标准包生成。新版构建与CI使用工作流中固定的配置回读平台源码SHA，无需 `PLATFORM_READ_TOKEN`。新版默认发布到 `https://ctl.shier.art`，镜像仓库默认 `ctl.shier.art`；GitHub Variables中的 `CTL_SERVER_URL`、`CTL_REGISTRY_HOST` 可覆盖这两个值，未配置或为空时分别使用默认值。推送托管镜像与登记版本使用必填的 `CTL_PUBLISH_TOKEN`，GitHub Release下载入口继续使用Actions提供的 `GITHUB_TOKEN`。
 
 v0.2.0已发布，标准包内四文件由deployctl生成。发布提交为 `35ff869f089c11db4ba02f0b818f9641b0169d35`；随后单独发布配置工具，源提交 `a32f7574bc60d9fac3469c0a7974a83c2f4b1668`，包括默认域名修改。配置工具为Release附加资产，与标准包分开，不手改Compose。
 
