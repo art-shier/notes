@@ -1,6 +1,6 @@
 # Notes 接入 ctl 管理服务
 
-本分支接入待发布的ctl1.7.0；现有公开Release不变。ctl服务端/管理台的部署见平台仓库 `docs/control-plane.md`。
+本页适用于 Notes [v0.3.2](https://github.com/art-shier/notes/releases/tag/v0.3.2) 与 ctl>=1.7.0。ctl服务端/管理台的部署见平台仓库 [服务端指南](https://github.com/art-shier/deployctl/blob/main/docs/control-plane.md)。
 
 在管理台注册项目 `notes`，默认环境 `prod`，镜像仓库默认使用 `ctl.shier.art/notes`。管理API与Registry可以共用 `ctl.shier.art`：HTTPS代理将 `/api/v1/` 与 `/v2/` 请求转发给支持Registry网关的ctl API。创建该项目的publisher凭据给GitHub，创建仅可读取prod的deployer凭据给生产服务器。
 
@@ -14,7 +14,7 @@ GitHub仓库设置：
 
 两个地址变量分别独立回退，显式非空值优先；仅设置其中一个时，另一个仍使用默认值。地址必须与ctl实例的public origin、Registry public host及项目登记的镜像仓库一致。服务连接或鉴权失败时停止发布，不自动切换地址或仓库。缺少publisher凭据时明确报错。
 
-流水线使用Notes自己的业务测试，默认推送到ctl托管仓库，固定digest镜像、生成标准包，调用`ctl publish --channel stable`后继续提供GitHub Release下载。清空地址变量不再切换至GHCR；现有GHCR版本与原发布包安装方式保持可用。平台源码引用固定实际SHA；新工具尚未发布，版本发布前需核对最终审核SHA。
+流水线使用Notes自己的业务测试，默认推送到ctl托管仓库。检查不可变索引中的 AMD64/ARM64 架构，按各自 manifest digest 运行最终镜像，兼容 Docker classic image store；通过后生成固定索引 digest 的标准包、调用`ctl publish --channel stable`，再提供GitHub Release下载。现有GHCR版本与原发布包安装方式保持可用，平台源码固定审核SHA。
 
 发布中断重跑会先取回ctl已经登记的同版本原始包/digest，并核对源码commit；有已完成的ctl版本时跳过镜像重建/再次推送，保留原stable指针。GitHub Release资产已存在时校验完全相同的字节，只上传缺失资产；不同内容拒绝覆盖。
 

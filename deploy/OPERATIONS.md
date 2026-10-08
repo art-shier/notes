@@ -2,13 +2,15 @@
 
 ctl1.7.0管理台/托管Registry接入见 [平台模式](CONTROL-PLANE.md)；本页保留原发布包与ConfigHub安装入口。
 
-application为notes，默认环境prod，主机127.0.0.1:8000，就绪接口 `/api/v1/health/ready`。默认域名为 `notes.shier.art`，新版用 `--set DOMAIN=域名` 覆盖。Go/Web使用现有Dockerfile；PostgreSQL与HTTPS代理外置。
+application为notes，默认环境prod，主机127.0.0.1:8000，就绪接口 `/api/v1/health/ready`。默认域名为 `notes.shier.art`；管理模式自定义域名在管理台设置 `APP_ORIGIN=https://域名`，`--set DOMAIN=域名` 仅在最终生效的DATABASE_URL为空、执行ConfigHub回退时生成APP_ORIGIN。Go/Web使用现有Dockerfile；PostgreSQL与HTTPS代理外置。
 
-## 新版自动配置流程（待发布）
+## ConfigHub 自动配置流程（v0.3.2）
+
+首选 [ctl 平台模式](CONTROL-PLANE.md)：在管理台配置有效的秘密 DATABASE_URL，服务器登录后执行 `sudo ctl install notes --prod`，pre 会直接检查连接。以下是未提供连接时的 ConfigHub 回退流程。
 
 不用填写DATABASE_URL、用户名、密码或提前下载prepare脚本。服务器需Linux、Python>=3.10、Docker Engine、Compose>=2.30、jq、root所有且不可被普通用户写入的ConfigHub CLI；Token文件默认 `/root/shier-prod.token`，root所有、权限600。沿用已有CLI凭据时显式传 `--set TOKEN_FILE=`。
 
-新包要求ctl>=1.6.0，v1.5.0不支持pre后配置回读。以下命令仅在新ctl/Notes版本发布后，使用Actions给出的真实RELEASE_URL与SHA256：
+新包要求ctl>=1.6.0配置回读能力，当前使用ctl>=1.7.0；v1.5.0不支持此流程。使用 [v0.3.2 Release](https://github.com/art-shier/notes/releases/tag/v0.3.2) 提供的真实RELEASE_URL与SHA256：
 
 ```bash
 sudo deployctl install notes --env prod --release "$RELEASE_URL" --sha256 "$SHA256"
@@ -27,9 +29,9 @@ sudo deployctl install notes --env prod --release "$RELEASE_URL" --sha256 "$SHA2
 
 post只在账户状态empty且传入ADMIN_EMAIL时生成邀请，pending/registered保持现状。邀请仅在服务器600的hook日志中，可由管理员读取 `/etc/deployctl/notes/prod/hook-logs/`；不自动回显到部署命令。
 
-pre失败不替换旧服务；启动/就绪/post失败恢复旧成功快照和版本。回滚不重跑hooks，也不撤销数据库迁移、邀请或原始配置文件变更。restart使用上次成功快照；要重新读取ConfigHub使用upgrade。
+pre失败不替换旧服务；启动/就绪/post失败恢复旧成功快照和版本。回滚不重跑hooks，也不撤销数据库迁移、邀请或原始配置文件变更。restart使用上次成功快照；upgrade重新拉取管理台配置。ConfigHub仅在最终生效的DATABASE_URL为空时读取；已有config.env/secrets.env中生成的连接也会走直接预检分支，普通upgrade不会自动刷新ConfigHub。
 
-ctl和Notes新版尚未发布；下面的v0.2.0步骤仍是旧版本的真实可用方式。
+下面的v0.2.0步骤保留为旧版本安装入口。
 
 ## 已发布版本与后续发布
 
@@ -37,7 +39,7 @@ notes自己的 `.github/workflows/release.yml` 完成测试、双架构镜像构
 
 v0.2.0已发布，标准包内四文件由deployctl生成。发布提交为 `35ff869f089c11db4ba02f0b818f9641b0169d35`；随后单独发布配置工具，源提交 `a32f7574bc60d9fac3469c0a7974a83c2f4b1668`，包括默认域名修改。配置工具为Release附加资产，与标准包分开，不手改Compose。
 
-新版源码使用自包含pre/post hook，安装时自动生成数据库连接，required_config为空。它依赖待发布的ctl>=1.6.0配置回读能力；旧v0.2.0保持不变。
+v0.3.2使用自包含pre/post hook，优先检查托管的数据库连接，未提供时自动生成，required_config为空。配置回读能力已包含在ctl1.7.0中。
 
 | 产物 | 地址 / 摘要 |
 |---|---|
