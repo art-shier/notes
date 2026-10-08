@@ -92,7 +92,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: art-shier/deployctl
-          ref: 9e62828e4f2a31f1b06d9bb5a500a16baafb8609
+          ref: 36faf3e5440e75b6bdff88d6460c128f8f3ec13e
           path: .ci-platform
           persist-credentials: false
       - name: Install contract parser
@@ -100,5 +100,7 @@ jobs:
         run: python3 -m pip install PyYAML==6.0.3
       - name: Standard hook package round-trip
         run: python3 tests/team_package_test.py .ci-platform
+      - name: Interrupted publication recovery
+        run: python3 tests/release_delivery_test.py .ci-platform
       - name: Real packaged hooks, ctl and TLS PostgreSQL
         run: sudo env CI=true "$(command -v python3)" tests/team_smoke.py .ci-platform

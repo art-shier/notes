@@ -14,6 +14,8 @@ GitHub仓库设置：
 
 两个变量必须同时设置。流水线使用Notes自己的业务测试，推送固定digest镜像、生成标准包，调用`ctl publish --channel stable`后继续提供GitHub Release下载。未设置变量时保持原GHCR方式。平台源码引用固定实际SHA；新工具尚未发布，版本发布前需核对最终审核SHA。
 
+发布中断重跑会先取回ctl已经登记的同版本原始包/digest，并核对源码commit；有已完成的ctl版本时跳过镜像重建/再次推送，保留原stable指针。GitHub Release资产已存在时校验完全相同的字节，只上传缺失资产；不同内容拒绝覆盖。
+
 prod环境业务变量至少配置有效的秘密`DATABASE_URL`，形式为包含用户名、密码、地址、端口、数据库名的完整PostgreSQL URL。密码特殊字符进行URL编码。默认`APP_ORIGIN=https://notes.shier.art`、`COOKIE_SECURE=true`来自Notes镜像，需要更改域名时在管理台设置`APP_ORIGIN`。端口在部署默认值或安装命令的`--port`中指定。
 
 安装参数可设置`ADMIN_EMAIL`：post仅在数据库没有账户/邀请时创建管理员邀请。邀请内容保存在ctl的私有hook日志。已有账户/邀请不会重复初始化。
