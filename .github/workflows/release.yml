@@ -162,9 +162,13 @@ jobs:
           jq -e '. as $index | all(["amd64", "arm64"][]; . as $arch | any($index.manifests[]; .platform.os == "linux" and .platform.architecture == $arch))' \
             "$RUNNER_TEMP/notes-image-index.json"
           for architecture in amd64 arm64; do
+            # Classic Docker stores cannot load both platforms by the same index digest.
+            manifest=$(jq -er --arg arch "$architecture" '[.manifests[] | select(.platform.os == "linux" and .platform.architecture == $arch) | .digest] | if length == 1 then .[0] else error("Expected one runtime manifest per architecture") end' \
+              "$RUNNER_TEMP/notes-image-index.json")
+            architecture_image="${IMAGE%@*}@${manifest}"
             docker run --rm --pull=always --platform "linux/$architecture" \
               --entrypoint shiji -e REQUIRE_DATABASE_URL=false \
-              -e DATABASE_URL=sqlite:////tmp/notes-image-smoke.db "$IMAGE" database-check
+              -e DATABASE_URL=sqlite:////tmp/notes-image-smoke.db "$architecture_image" database-check
           done
       - name: Generate standard deployment package
         id: package
