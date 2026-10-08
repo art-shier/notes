@@ -63,6 +63,14 @@ if [[ ${TEST_DB_FAIL:-0} == 1 ]];then echo 'sensitive-db-error' >&2;exit 8;fi
         env={**os.environ,'TEST_BIN':str(bins).replace('\\','/'),'TEST_VALUES':str(values).replace('\\','/'),'TEST_LOG':str(log).replace('\\','/'),**hook_env,**overrides}
         script=('export PATH="$(cygpath -u "$TEST_BIN"):$PATH"; ' if os.name=='nt' else 'export PATH="$TEST_BIN:$PATH"; ')+'exec bash "$@"'
         return subprocess.run([BASH,'-c',script,'test',str(script_file).replace('\\','/'),*args,*extra],env=env,capture_output=True,text=True,encoding='utf-8',timeout=60)
+    if hook:
+        snapshot=base/'snapshot';snapshot.mkdir()
+        (snapshot/'.env.json').write_text('{}')
+        (snapshot/'effective.env').write_text('DATABASE_URL=postgresql://fixture:secret@db.test/notes\n')
+        managed=run(DATABASE_URL='postgresql://fixture:secret@db.test/notes',DEPLOYCTL_ENV_FILE=path(snapshot/'.env.json'),TEST_FETCH_FAIL='1',DEPLOYCTL_PARAM_CLI_BINARY=path(base/'absent-cli'),DEPLOYCTL_PARAM_TOKEN_FILE=path(base/'absent-token'))
+        assert managed.returncode==0,('Managed DATABASE_URL must not fetch ConfigHub',managed.stdout,managed.stderr)
+        assert not (cfg/'notes/prod/secrets.env').exists(),'Managed check must not overwrite local config'
+        assert run(DATABASE_URL='sqlite:///bad',DEPLOYCTL_ENV_FILE=path(snapshot/'.env.json')).returncode!=0
     result=run();assert result.returncode==0,(result.stdout,result.stderr)
     target=cfg/'notes/prod';files=['config.env','secrets.env','.notes-team.json','.database-target']
     before={n:(target/n).read_bytes() for n in files}
@@ -84,7 +92,7 @@ if [[ ${TEST_DB_FAIL:-0} == 1 ]];then echo 'sensitive-db-error' >&2;exit 8;fi
         assert all((target/n).read_bytes()==data for n,data in before.items()), 'Interrupted publication was not restored'
     fixture(host='other.example.test');assert run().returncode!=0
     assert all((target/n).read_bytes()==data for n,data in before.items())
-    fixture(secret='rotated');assert run(DATABASE_URL='wrong',APP_ORIGIN='https://wrong.test').returncode==0
+    fixture(secret='rotated');assert run(**({'APP_ORIGIN':'https://wrong.test'} if hook else {'DATABASE_URL':'wrong','APP_ORIGIN':'https://wrong.test'})).returncode==0
     assert b'rotated' in (target/'secrets.env').read_bytes() and b'wrong.test' not in (target/'config.env').read_bytes()
     if hook:
         assert run(DEPLOYCTL_IMAGE='ghcr.io/example/fixture:latest').returncode!=0

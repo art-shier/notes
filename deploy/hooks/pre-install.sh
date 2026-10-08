@@ -97,6 +97,21 @@ environment=${DEPLOYCTL_ENVIRONMENT:?missing deployment environment}
 config_dir=${DEPLOYCTL_CONFIG_DIR:?missing deployment config directory}
 [[ $config_dir == */notes/"$environment" ]] || native_die '配置目录与部署环境不一致。'
 config_root=${config_dir%/notes/"$environment"}
+if [[ -n ${DATABASE_URL:-} ]]; then
+  [[ $DATABASE_URL == postgresql://* || $DATABASE_URL == postgres://* ]] || native_die '生产部署需要PostgreSQL连接。'
+  image=${DEPLOYCTL_IMAGE:?missing immutable image}
+  [[ $image =~ ^[a-z0-9][a-z0-9./:_-]*@sha256:[a-f0-9]{64}$ ]] || native_die '需要固定镜像digest。'
+  effective="$(dirname -- "${DEPLOYCTL_ENV_FILE:?missing effective snapshot}")/effective.env"
+  [[ -f $effective && ! -L $effective ]] || native_die '需要ctl生成的最终运行配置。'
+  check_log=$(mktemp)
+  trap 'rm -f -- "$check_log"' EXIT
+  # ctl already authenticated and pulled this digest. Hooks receive no Registry token.
+  if ! docker run --rm --pull never --entrypoint shiji --env-file "$effective" "$image" database-check > "$check_log" 2>&1; then
+    native_die '只读数据库预检失败，确认管理台中的连接配置。'
+  fi
+  printf '[拾记] 有效数据库配置及只读预检通过。\n'
+  exit 0
+fi
 set -- --image "${DEPLOYCTL_IMAGE:?missing immutable image}" \
   --env "$environment" --config-root "$config_root" \
   --domain "${DEPLOYCTL_PARAM_DOMAIN-notes.shier.art}" \
@@ -175,7 +190,7 @@ shiji_read_database "$stage" "$hub_project" "$hub_env" "$database" "${CLI[@]}" |
 if [[ -f $config_dir/.database-target ]]; then cmp -s -- "$config_dir/.database-target" "$stage/target" || native_die '数据库目标变化，拒绝自动切库。';fi
 printf 'APP_ORIGIN=https://%s\nCOOKIE_SECURE=true\nLISTEN_ADDR=0.0.0.0:8000\nWEB_DIR=/app/web\nATTACHMENTS_DIR=/data/attachments\nEXPORTS_DIR=/data/exports\nNOTE_HISTORY_LIMIT=200\nEXPORT_LIMIT_BYTES=2147483648\nTZ=UTC\n' "$domain" > "$stage/config.env"
 printf 'DATABASE_URL=%s\n' "$(jq -er .uri "$stage/database.json")" > "$stage/secrets.env"
-if ! docker run --rm --pull always --entrypoint shiji --env-file "$stage/config.env" --env-file "$stage/secrets.env" "$image" database-check > "$stage/check.log" 2>&1; then
+if ! docker run --rm --pull never --entrypoint shiji --env-file "$stage/config.env" --env-file "$stage/secrets.env" "$image" database-check > "$stage/check.log" 2>&1; then
   native_die '镜像拉取或只读数据库预检失败，保留原配置；确认镜像拉取权限和数据库连接。'
 fi
 chmod 600 -- "$stage/config.env" "$stage/secrets.env" "$stage/metadata" "$stage/target"

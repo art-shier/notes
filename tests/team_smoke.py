@@ -95,9 +95,14 @@ try:
         assert (folder/file).stat().st_mode&0o777==0o600
     before=container();source=(folder/'secrets.env').read_bytes()
     failure_marker.touch()
+    # Effective DATABASE_URL avoids ConfigHub even when its credential is unavailable.
+    first=manager.deploy('notes',deploy_env,package,upgrade=True,install_params=params)
+    assert (folder/'secrets.env').read_bytes()==source
+    before=container()
     try:
-        manager.deploy('notes',deploy_env,package,upgrade=True,install_params=params)
-        raise AssertionError('Failed fetch was accepted')
+        manager.deploy('notes',deploy_env,package,upgrade=True,install_params=params,
+            runtime_env={'DATABASE_URL':f'postgresql://notes:{password}@{gateway}:{db_port}/missing_database?sslmode=require&connect_timeout=5'})
+        raise AssertionError('Invalid database was accepted')
     except RuntimeError as error:
         assert password not in str(error)
         assert 'pre_install' in str(error)
@@ -133,7 +138,7 @@ try:
     assert run(['docker','exec',container(),'shiji','bootstrap-status'])=='pending'
     missing=subprocess.run(['docker','run','--rm','--entrypoint','shiji',image,'database-check'],capture_output=True,text=True)
     assert missing.returncode!=0 and 'DATABASE_URL must be generated' in missing.stderr
-    print('PASS: packaged pre -> config refresh -> real Notes/TLS PG16, effective overrides, rollback, failed fetch/post and bootstrap idempotence')
+    print('PASS: packaged pre -> config refresh -> real Notes/TLS PG16, effective DB without ConfigHub, overrides, rollback, failed DB/post and bootstrap idempotence')
 finally:
     # These names and the root directory are unique fixtures created above.
     identifiers=subprocess.run(['docker','ps','-aq','--filter','label=com.docker.compose.project='+app_project],capture_output=True,text=True).stdout.split()

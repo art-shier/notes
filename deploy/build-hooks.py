@@ -9,6 +9,21 @@ environment=${DEPLOYCTL_ENVIRONMENT:?missing deployment environment}
 config_dir=${DEPLOYCTL_CONFIG_DIR:?missing deployment config directory}
 [[ $config_dir == */notes/"$environment" ]] || native_die '配置目录与部署环境不一致。'
 config_root=${config_dir%/notes/"$environment"}
+if [[ -n ${DATABASE_URL:-} ]]; then
+  [[ $DATABASE_URL == postgresql://* || $DATABASE_URL == postgres://* ]] || native_die '生产部署需要PostgreSQL连接。'
+  image=${DEPLOYCTL_IMAGE:?missing immutable image}
+  [[ $image =~ ^[a-z0-9][a-z0-9./:_-]*@sha256:[a-f0-9]{64}$ ]] || native_die '需要固定镜像digest。'
+  effective="$(dirname -- "${DEPLOYCTL_ENV_FILE:?missing effective snapshot}")/effective.env"
+  [[ -f $effective && ! -L $effective ]] || native_die '需要ctl生成的最终运行配置。'
+  check_log=$(mktemp)
+  trap 'rm -f -- "$check_log"' EXIT
+  # ctl already authenticated and pulled this digest. Hooks receive no Registry token.
+  if ! docker run --rm --pull never --entrypoint shiji --env-file "$effective" "$image" database-check > "$check_log" 2>&1; then
+    native_die '只读数据库预检失败，确认管理台中的连接配置。'
+  fi
+  printf '[拾记] 有效数据库配置及只读预检通过。\n'
+  exit 0
+fi
 set -- --image "${DEPLOYCTL_IMAGE:?missing immutable image}" \
   --env "$environment" --config-root "$config_root" \
   --domain "${DEPLOYCTL_PARAM_DOMAIN-notes.shier.art}" \
@@ -27,7 +42,7 @@ def generated():
         result+='\n'+path.read_text(encoding='utf-8').split('\n',1)[1]
     prepare=(ROOT/'deploy/prepare.sh').read_text(encoding='utf-8')
     result+='\n'+ADAPTER+'\n'+prepare[prepare.index('domain=notes.shier.art'):]
-    return result.replace('现在可执行deployctl install/upgrade。','继续安装或升级。').encode('utf-8')
+    return result.replace('--pull always','--pull never').replace('现在可执行deployctl install/upgrade。','继续安装或升级。').encode('utf-8')
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--check',action='store_true');args=parser.parse_args()
