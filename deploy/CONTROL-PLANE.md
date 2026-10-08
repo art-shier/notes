@@ -1,6 +1,6 @@
 # Notes 接入 ctl 管理服务
 
-本页适用于 Notes [v0.3.2](https://github.com/art-shier/notes/releases/tag/v0.3.2) 与 ctl>=1.7.0。ctl服务端/管理台的部署见平台仓库 [服务端指南](https://github.com/art-shier/deployctl/blob/main/docs/control-plane.md)。
+本页适用于当前Notes标准包与ctl平台配置。ctl服务端/管理台的部署见平台仓库 [服务端指南](https://github.com/art-shier/deployctl/blob/main/docs/control-plane.md)。
 
 在管理台注册项目 `notes`，默认环境 `prod`，镜像仓库默认使用 `ctl.shier.art/notes`。管理API与Registry可以共用 `ctl.shier.art`：HTTPS代理将 `/api/v1/` 与 `/v2/` 请求转发给支持Registry网关的ctl API。创建该项目的publisher凭据给GitHub，创建仅可读取prod的deployer凭据给生产服务器。
 
@@ -18,17 +18,17 @@ GitHub仓库设置：
 
 发布中断重跑会先取回ctl已经登记的同版本原始包/digest，并核对源码commit；有已完成的ctl版本时跳过镜像重建/再次推送，保留原stable指针。GitHub Release资产已存在时校验完全相同的字节，只上传缺失资产；不同内容拒绝覆盖。
 
-prod环境业务变量至少配置有效的秘密`DATABASE_URL`，形式为包含用户名、密码、地址、端口、数据库名的完整PostgreSQL URL。密码特殊字符进行URL编码。默认`APP_ORIGIN=https://notes.shier.art`、`COOKIE_SECURE=true`来自Notes镜像，需要更改域名时在管理台设置`APP_ORIGIN`。端口在部署默认值或安装命令的`--port`中指定。
+prod环境配置完整PostgreSQL `DATABASE_URL`，或提供`DB_HOST`、`DB_USER`与秘密`DB_PASSWORD`。可选`DB_PORT`默认5432、`DB_NAME`默认notes、`DB_SSLMODE`默认require（也支持verify-ca/verify-full）。可以在组环境配置公共主机/端口/TLS，在notes项目环境设置专用账号、密码及库名。Go只在DATABASE_URL缺失时安全拼接并编码DB_*；已有DATABASE_URL优先，改用字段时先核对最终配置中是否仍有该URL。默认`APP_ORIGIN=https://notes.shier.art`、`COOKIE_SECURE=true`来自镜像，自定义域名设置`APP_ORIGIN`，端口使用`--port`。
 
 安装参数可设置`ADMIN_EMAIL`：post仅在数据库没有账户/邀请时创建管理员邀请。邀请内容保存在ctl的私有hook日志。已有账户/邀请不会重复初始化。
 
 ```bash
-sudo ctl login --server https://ctl.shier.art
+sudo ctl login
 sudo ctl install notes --prod
 sudo ctl upgrade notes --prod
 sudo ctl status notes --prod
 ```
 
-有有效`DATABASE_URL`时pre直接使用最终快照做只读数据库检查，不要求ConfigHub CLI或Token，也不改写本地生成文件。没有连接时直接调用ConfigHub CLI，使用执行安装的用户已有登录配置，生成配置并由ctl回读；不默认读取额外Token文件。ConfigHub失败保留原始错误和退出码，详见ctl提示的受保护hook日志。ctl已经拉取受检镜像，pre/post辅助容器使用`--pull never`，不接触私有Registry凭据。数据库不存在或不可连接时阻止替换服务，生产不回退SQLite。
+pre仅消费ctl私有最终快照effective.env，用已拉取的固定digest镜像执行只读database-check；不生成或改写配置，refresh_config关闭。Notes不再读取ConfigHub，服务器无需其CLI或Token。pre/post辅助容器使用`--pull never`。字段缺失/无效、数据库不存在或不可连接时阻止替换服务，生产不回退SQLite；检查错误不输出秘密值。
 
 管理台配置优先于CLI同名变量/参数。保存不立即重启，下一次安装/升级生效；失败恢复实际旧版本、配置和绑定。数据库/邀请副作用及图片/导出持久化保持此前边界，后续OSS接入单独实现。

@@ -96,11 +96,11 @@ shiji serve
 
 ## 6. 本轮证据
 
-### ConfigHub 外部数据库模式
+### 已有外部数据库模式
 
-首次部署与后续配置刷新参见根 [README](README.md#confighub--已有-postgresql-部署)。`ops/start.sh` 在启动前调用 CLI 拉取、生成配置并执行只读数据库预检；不创建外部库、不改其他业务库。启动目标使用 `compose.external.yaml`，只包含 app/caddy，图片仍存放在本项目持久卷。
+生产首次部署参见[ctl配置](deploy/CONTROL-PLANE.md)。既有Compose实例继续使用私有.env；ops/start.sh仅构建、只读预检及启动，不拉取ConfigHub或改写配置。compose.external.yaml只包含app/caddy，不创建外部库，图片仍保存在原项目持久卷。
 
-备份仍使用 `ops/backup.sh`，会暂停本项目 app 并由容器中的 PostgreSQL16客户端连接外部数据库。恢复时，新项目的 `.env` 必须指向**已创建的独立空数据库**，同时设置 `COMPOSE_FILE=compose.external.yaml`；`ops/restore.sh` 检测不到本地 db 服务时跳过创建数据库容器，先执行 Go 只读连接检查，再由恢复工具核验空库和空附件目录。恢复后直接启动 app/caddy即可；后续 ConfigHub 刷新必须使用恢复目标对应的项目/环境/专用账号配置。
+备份仍使用ops/backup.sh，暂停本项目app并连接外部库。恢复时新项目私有.env必须指向已创建的独立空数据库并设置COMPOSE_FILE=compose.external.yaml；ops/restore.sh跳过本地db，先只读检查，再核验空库和空附件目录。恢复后启动app/caddy；目标配置须由管理员明确提供，不再由ConfigHub刷新。
 
 Go迁移验证记录见 [Go迁移实施计划](notes-go-migration-plan.md)，旧阶段记录保留在 [部署与恢复阶段方案](notes-operations-phase-plan.md)。本地使用真实迁移的隔离库，通过独立Go CLI进程备份/校验/恢复，再启动恢复库API；旧密码、Token、图文与历史均可继续使用。主预览已切换Go，未创建测试账号。
 

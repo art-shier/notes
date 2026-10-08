@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory() as temporary:
     target=base/'unpacked';release=unpack_release(archive,target)
     assert release['schema_version']==2 and release['minimum_deployctl_version']=='1.6.0'
     assert release['deployment']['required_config']==[]
-    assert release['hooks']['pre_install']['refresh_config'] is True
+    assert release['hooks']['pre_install']['refresh_config'] is False
     assert 'DATABASE_URL' not in (target/'.env.example').read_text()
     for phase in ('pre','post'):
         assert (target/f'hooks/{phase}-install.sh').read_bytes()==(ROOT/f'deploy/hooks/{phase}-install.sh').read_bytes()

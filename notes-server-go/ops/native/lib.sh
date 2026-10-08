@@ -33,34 +33,24 @@ native_meta() {
   field() { jq -er --arg key "$1" '.[$key] | select(type == "string")' "$config_dir/native.json" 2>/dev/null; }
   domain=$(field domain); port=$(field port); service_user=$(field service_user)
   install_dir=$(field install_dir); data_dir=$(field data_dir)
-  hub_url=$(field hub_url); hub_project=$(field hub_project); hub_env=$(field hub_env)
-  database=$(field database); cli=$(field cli); token_file=$(field token_file)
   [[ ${#domain} -le 253 && $domain =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$ ]] || native_die '域名无效。'
   [[ $port =~ ^[0-9]{1,5}$ && $port -ge 1024 && $port -le 65535 ]] || native_die '本机监听端口必须在1024至65535之间。'
   [[ $service_user =~ ^[a-z][a-z0-9-]{1,27}$ ]] || native_die '服务账号标识无效。'
-  native_plain_path "$install_dir"; native_plain_path "$data_dir"; native_plain_path "$cli"
+  native_plain_path "$install_dir"; native_plain_path "$data_dir"
   native_root_chain "$install_dir";native_root_chain "$config_dir"
-  native_root_chain "$(dirname -- "$cli")"
-  [[ $hub_url =~ ^https://[a-zA-Z0-9.-]+(:[0-9]{1,5})?(/[^[:space:]?#]*)?$ && $hub_url != *'@'* ]] || native_die 'ConfigHub地址必须HTTPS。'
-  [[ $hub_project =~ ^[a-z0-9][a-z0-9-]{0,62}$ && $hub_env =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]] || native_die 'ConfigHub项目/环境无效。'
-  [[ $database =~ ^[a-z][a-z0-9_]{0,62}$ && $database != postgres && $database != template0 && $database != template1 ]] || native_die '需要独立的业务数据库。'
-  [[ -x $cli && -f $cli && $(stat -c %u -- "$cli") == 0 ]] || native_die 'ConfigHub CLI必须属于root且可执行。'
-  local cli_mode
-  cli_mode=$(stat -c %a -- "$cli")
-  (( (8#$cli_mode & 022) == 0 )) || native_die 'ConfigHub CLI不能允许组或其他用户写入。'
-  CLI=("$cli" --server "$hub_url")
-  if [[ -n $token_file ]]; then
-    native_plain_path "$token_file"; native_private_file "$token_file"
-    CLI+=(--token-file "$token_file")
-  fi
 }
 native_load_env() {
-  local config_dir=$1 key value
-  native_private_file "$config_dir/service.env"
+  native_read_env "$1/service.env"
+}
+native_read_env() {
+  local file=$1 key value
+  native_plain_path "$file"; native_root_chain "$(dirname -- "$file")"
+  native_private_file "$file"
   while IFS='=' read -r key value; do
     case $key in
-      DATABASE_URL|APP_ORIGIN|COOKIE_SECURE|LISTEN_ADDR|WEB_DIR|ATTACHMENTS_DIR|EXPORTS_DIR|NOTE_HISTORY_LIMIT|EXPORT_LIMIT_BYTES|TZ) export "$key=$value";;
+      DATABASE_URL|DB_HOST|DB_PORT|DB_USER|DB_PASSWORD|DB_NAME|DB_SSLMODE|REQUIRE_DATABASE_URL|APP_ORIGIN|COOKIE_SECURE|LISTEN_ADDR|WEB_DIR|ATTACHMENTS_DIR|EXPORTS_DIR|NOTE_HISTORY_LIMIT|EXPORT_LIMIT_BYTES|TZ) export "$key=$value";;
       *) native_die '生成配置包含未知字段。';;
     esac
-  done < "$config_dir/service.env"
+  done < "$file"
+  export REQUIRE_DATABASE_URL=true
 }

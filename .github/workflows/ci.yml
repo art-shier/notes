@@ -37,9 +37,9 @@ jobs:
           if ! command -v jq >/dev/null; then sudo apt-get update && sudo apt-get install -y jq; fi
           python3 tests/deploy_test.py
           python3 tests/config_hub_start_test.py
-          python3 tests/native_config_test.py
-          python3 tests/team_config_test.py
-          python3 tests/team_hook_test.py
+          sudo python3 tests/native_config_test.py
+          sudo python3 tests/team_config_test.py
+          sudo python3 tests/team_hook_test.py
           python3 tests/native_install_test.py
           python3 tests/client_install_test.py
   native-systemd:
@@ -86,7 +86,7 @@ jobs:
         run: bash notes-server-go/ops/test-release.sh
       - name: PostgreSQL 16 API and backup restore smoke
         run: python3 tests/pg_smoke.py
-      - name: Real ConfigHub startup with TLS PostgreSQL
+      - name: Existing private configuration startup with TLS PostgreSQL
         run: python3 tests/startup_smoke.py
       - name: Check out exact configuration-refresh platform
         uses: actions/checkout@v4

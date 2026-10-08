@@ -42,12 +42,13 @@ def container():
     return run(['docker','ps','-q','--filter','label=com.docker.compose.project='+app_project])
 def values():
     return json.loads(run(['docker','exec',container(),'sh','-c','cat "$DEPLOYCTL_ENV_FILE"']))
+def origin():
+    # effective.env stores supplied overrides; image defaults remain in Docker ENV.
+    return run(['docker','exec',container(),'printenv','APP_ORIGIN'])
 manager=Manager(base/'apps',base/'config')
 folder=base/'config/notes'/deploy_env
 certs=base/'certs';certs.mkdir(mode=0o755)
-cli=base/'confighub';payload=base/'hub.json';failure_marker=base/'fetch-failed'
-cli.write_text(f'#!/usr/bin/env bash\n[[ ! -e {failure_marker} ]] || exit 7\ncat {payload}\n');cli.chmod(0o700)
-params={'CLI_BINARY':str(cli)}
+params={}
 try:
     gateway=run(['docker','network','inspect','bridge','--format','{{(index .IPAM.Config 0).Gateway}}'])
     run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=notes-ci','-keyout',certs/'server.key','-out',certs/'server.crt'])
@@ -71,8 +72,10 @@ try:
       retries: 30
 ''')
     db('up','-d','--wait','--wait-timeout','120')
-    payload.write_text(json.dumps({'project':'shier','environment':'prod','values':{
-        'db_address':gateway,'db_port':str(db_port),'notes_db_username':'notes','notes_db_password':password}}));payload.chmod(0o600)
+    folder.mkdir(parents=True,mode=0o700)
+    (folder/'config.env').write_text(f'DB_HOST={gateway}\nDB_PORT={db_port}\nDB_NAME=notes\nDB_SSLMODE=require\n')
+    (folder/'secrets.env').write_text(f'DB_USER=notes\nDB_PASSWORD={password}\n')
+    (folder/'config.env').chmod(0o600);(folder/'secrets.env').chmod(0o600)
     run(['docker','run','-d','--name',registry,'-p',f'127.0.0.1:{registry_port}:5000','registry:2'])
     for attempt in range(30):
         try:
@@ -85,16 +88,15 @@ try:
     image=run(['docker','image','inspect',tag,'--format','{{index .RepoDigests 0}}'])
     config=read_yaml(ROOT/'deploy/deployment.yaml')
     package=build_release(config,image,'v0.0.0-ci',base/'packages',project_root=ROOT)
-    assert not (folder/'secrets.env').exists()
     first=manager.deploy('notes',deploy_env,package,port=port,install_params=params)
-    assert first['transaction'] is None and 'DATABASE_URL' in values()
+    assert first['transaction'] is None and values()['DB_USER']=='notes' and 'DATABASE_URL' not in values()
+    assert 'APP_ORIGIN' not in values() and origin()=='https://notes.shier.art'
     assert run(['docker','exec',container(),'shiji','bootstrap-status'])=='empty'
     assert int(db('exec','-T','db','psql','-U','notes','-d','notes','-At','-c',"SELECT count(*) FROM pg_stat_ssl s JOIN pg_stat_activity a ON a.pid=s.pid WHERE a.datname='notes' AND s.ssl"))>0
-    for file in ('config.env','secrets.env','.notes-team.json','.database-target'):
+    for file in ('config.env','secrets.env'):
         assert (folder/file).stat().st_mode&0o777==0o600
     before=container();source=(folder/'secrets.env').read_bytes()
-    failure_marker.touch()
-    # Effective DATABASE_URL avoids ConfigHub even when its credential is unavailable.
+    # Runtime fields are checked as provided, with no remote configuration tool.
     first=manager.deploy('notes',deploy_env,package,upgrade=True,install_params=params)
     assert (folder/'secrets.env').read_bytes()==source
     before=container()
@@ -106,12 +108,12 @@ try:
         assert password not in str(error)
         assert 'pre_install' in str(error)
     assert container()==before and (folder/'secrets.env').read_bytes()==source
-    failure_marker.unlink()
     second=manager.deploy('notes',deploy_env,package,upgrade=True,install_params=params,
         runtime_env={'APP_ORIGIN':'https://override.example.test'})
     assert second['previous']==first['current'] and values()['APP_ORIGIN']=='https://override.example.test'
+    assert origin()=='https://override.example.test'
     manager.rollback('notes',deploy_env)
-    assert values()['APP_ORIGIN']=='https://notes.shier.art'
+    assert 'APP_ORIGIN' not in values() and origin()=='https://notes.shier.art'
     # A real failing post hook must restore the old successful runtime.
     failing=copy.deepcopy(config);failing['hooks']['post_install']['script']='post-fail.sh'
     (base/'post-fail.sh').write_text('exit 7\n')
@@ -129,15 +131,15 @@ try:
     assert diagnostic['phase']=='post_install' and diagnostic['version']=='v0.0.1-ci'
     current=json.loads((base/'apps/notes'/deploy_env/'state.json').read_text())
     assert current['transaction'] is None and current['current']==first['current']
-    assert values()['APP_ORIGIN']=='https://notes.shier.art'
+    assert 'APP_ORIGIN' not in values() and origin()=='https://notes.shier.art'
     # Bootstrap uses effective overrides, then preserves the pending invitation.
     manager.deploy('notes',deploy_env,package,upgrade=True,install_params={**params,'ADMIN_EMAIL':'ci@example.test'})
     assert run(['docker','exec',container(),'shiji','bootstrap-status'])=='pending'
     manager.deploy('notes',deploy_env,package,upgrade=True,install_params={**params,'ADMIN_EMAIL':'other@example.test'})
     assert run(['docker','exec',container(),'shiji','bootstrap-status'])=='pending'
     missing=subprocess.run(['docker','run','--rm','--entrypoint','shiji',image,'database-check'],capture_output=True,text=True)
-    assert missing.returncode!=0 and 'DATABASE_URL must be generated' in missing.stderr
-    print('PASS: packaged pre -> config refresh -> real Notes/TLS PG16, effective DB without ConfigHub, overrides, rollback, failed DB/post and bootstrap idempotence')
+    assert missing.returncode!=0 and 'DB_HOST' in missing.stderr and 'DB_PASSWORD' in missing.stderr
+    print('PASS: ctl DB fields -> packaged pre -> real Notes/TLS PG16, overrides, rollback, failed DB/post and bootstrap idempotence')
 finally:
     # These names and the root directory are unique fixtures created above.
     identifiers=subprocess.run(['docker','ps','-aq','--filter','label=com.docker.compose.project='+app_project],capture_output=True,text=True).stdout.split()

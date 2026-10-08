@@ -80,16 +80,12 @@ echo 'Package unavailable' >&2; exit 100
     assert r.returncode!=0 and not (unavailable/'notes-server-go/.env').exists()
     checkpoint=(base/'log').read_text()
     r=call(base/'hub',*args,'--config-hub','--config-hub-project','shier','--config-hub-env','prod','--database-name','notes','--token-file','/private/hub.token')
-    assert r.returncode==0,(r.stdout,r.stderr)
-    newlog=(base/'log').read_text()[len(checkpoint):]
-    assert '--config-hub-project shier --config-hub-env prod' in newlog and '--token-file /private/hub.token' in newlog
-    assert 'bootstrap-status' in newlog and 'psql' not in newlog
-    assert 'POSTGRES_PASSWORD' not in (base/'hub/notes-server-go/.env').read_text()
-    (base/'hub/notes-server-go/.config-hub.json').write_text('{}')
+    assert r.returncode!=0 and not (base/'hub').exists(), 'Removed ConfigHub parameters must stop before installation'
+    (app/'notes-server-go/.config-hub.json').write_text('{}')
     checkpoint=(base/'log').read_text()
-    r=call(base/'hub',*args,'--config-hub-url','https://replacement.example.test')
+    r=call(app,*args)
     assert r.returncode==0,(r.stdout,r.stderr)
-    assert '--config-hub-url https://replacement.example.test' in (base/'log').read_text()[len(checkpoint):]
+    assert 'confighub' not in (base/'log').read_text()[len(checkpoint):] and envfile.read_text()==before
     r=call(base/'old-checkout',*args,TEST_OLD_APP='1',TEST_STATE='registered')
     assert r.returncode==0,(r.stdout,r.stderr)
     log=(base/'log').read_text();assert 'down' not in log and '--wait' in log

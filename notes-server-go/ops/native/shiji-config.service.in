@@ -1,6 +1,6 @@
 # Managed by art-shier/notes native installer
 [Unit]
-Description=Shiji configuration refresh from ConfigHub
+Description=Shiji private database configuration preflight
 Wants=network-online.target
 After=network-online.target
 Before=@SERVICE@.service

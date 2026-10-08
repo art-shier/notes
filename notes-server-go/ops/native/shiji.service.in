@@ -11,6 +11,7 @@ User=@SERVICE@
 Group=@SERVICE@
 WorkingDirectory=@DATA@
 EnvironmentFile=@CONFIG@/service.env
+Environment=REQUIRE_DATABASE_URL=true
 ExecStartPre=@INSTALL@/current/shiji migrate
 ExecStart=@INSTALL@/current/shiji serve
 Restart=on-failure
