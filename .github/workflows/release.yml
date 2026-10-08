@@ -153,6 +153,19 @@ jobs:
           tags: ${{ steps.config.outputs.image_name }}:${{ env.RELEASE_VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Verify published image on both architectures
+        if: steps.recovery.outputs.recovered != 'true'
+        env:
+          IMAGE: ${{ format('{0}@{1}', steps.config.outputs.image_name, steps.image.outputs.digest) }}
+        run: |
+          docker buildx imagetools inspect "$IMAGE" --raw > "$RUNNER_TEMP/notes-image-index.json"
+          jq -e '. as $index | all(["amd64", "arm64"][]; . as $arch | any($index.manifests[]; .platform.os == "linux" and .platform.architecture == $arch))' \
+            "$RUNNER_TEMP/notes-image-index.json"
+          for architecture in amd64 arm64; do
+            docker run --rm --pull=always --platform "linux/$architecture" \
+              --entrypoint shiji -e REQUIRE_DATABASE_URL=false \
+              -e DATABASE_URL=sqlite:////tmp/notes-image-smoke.db "$IMAGE" database-check
+          done
       - name: Generate standard deployment package
         id: package
         working-directory: source
