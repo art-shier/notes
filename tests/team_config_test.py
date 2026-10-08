@@ -38,10 +38,39 @@ if [[ ${TEST_DB_FAIL:-0} == 1 ]];then echo 'sensitive-db-error' >&2;exit 8;fi
         p=bins/name;p.write_text('#!/usr/bin/env bash\n'+body,encoding='utf-8',newline='\n');p.chmod(0o755)
     image='ghcr.io/example/fixture@sha256:'+'0'*64  # Test fixture, never published.
     args=['--image',image,'--config-root',path(cfg),'--cli-binary',path(bins/'confighub')]
+    script_file=ROOT/'deploy/prepare.sh'
+    hook=bool(os.environ.get('NOTES_TEST_HOOK'))
+    hook_env={}
+    if hook:
+        # Execute the exact packaged script from outside the checkout.
+        script_file=base/'isolated-pre.sh'
+        shutil.copyfile(ROOT/'deploy/hooks/pre-install.sh',script_file)
+        # Inject one test-only fault precisely between successful publication
+        # commands; all normal executions still take the pristine code path.
+        script_file.write_text(script_file.read_text(encoding='utf-8').replace(
+            'mv -Tf -- "$stage/config.env" "$config_dir/config.env"',
+            'if [[ ${TEST_SIGNAL_ZERO_STATUS:-0} == 1 || ${TEST_SIGNAL_FAIL:-0} == 1 ]];then '
+            'sed -i s/NOTE_HISTORY_LIMIT=200/NOTE_HISTORY_LIMIT=201/ "$stage/config.env";fi\n'
+            'mv -Tf -- "$stage/config.env" "$config_dir/config.env"\n'
+            'if [[ ${TEST_SIGNAL_ZERO_STATUS:-0} == 1 ]];then trap - EXIT;cleanup;exit 143;fi\n'
+            'if [[ ${TEST_SIGNAL_FAIL:-0} == 1 ]];then kill -TERM $$;fi'),encoding='utf-8',newline='\n')
+        token=base/'token';token.write_text('fixture-token',encoding='utf-8');token.chmod(0o600)
+        hook_env={'DEPLOYCTL_APPLICATION':'notes','DEPLOYCTL_ENVIRONMENT':'prod',
+            'DEPLOYCTL_IMAGE':image,'DEPLOYCTL_CONFIG_DIR':path(cfg/'notes/prod'),
+            'DEPLOYCTL_PARAM_CLI_BINARY':path(bins/'confighub'),'DEPLOYCTL_PARAM_TOKEN_FILE':path(token)}
+        args=[]
     def run(*extra,**overrides):
-        env={**os.environ,'TEST_BIN':str(bins).replace('\\','/'),'TEST_VALUES':str(values).replace('\\','/'),'TEST_LOG':str(log).replace('\\','/'),**overrides}
+        env={**os.environ,'TEST_BIN':str(bins).replace('\\','/'),'TEST_VALUES':str(values).replace('\\','/'),'TEST_LOG':str(log).replace('\\','/'),**hook_env,**overrides}
         script=('export PATH="$(cygpath -u "$TEST_BIN"):$PATH"; ' if os.name=='nt' else 'export PATH="$TEST_BIN:$PATH"; ')+'exec bash "$@"'
-        return subprocess.run([BASH,'-c',script,'test',str(ROOT/'deploy/prepare.sh').replace('\\','/'),*args,*extra],env=env,capture_output=True,text=True,encoding='utf-8',timeout=60)
+        return subprocess.run([BASH,'-c',script,'test',str(script_file).replace('\\','/'),*args,*extra],env=env,capture_output=True,text=True,encoding='utf-8',timeout=60)
+    if hook:
+        snapshot=base/'snapshot';snapshot.mkdir()
+        (snapshot/'.env.json').write_text('{}')
+        (snapshot/'effective.env').write_text('DATABASE_URL=postgresql://fixture:secret@db.test/notes\n')
+        managed=run(DATABASE_URL='postgresql://fixture:secret@db.test/notes',DEPLOYCTL_ENV_FILE=path(snapshot/'.env.json'),TEST_FETCH_FAIL='1',DEPLOYCTL_PARAM_CLI_BINARY=path(base/'absent-cli'),DEPLOYCTL_PARAM_TOKEN_FILE=path(base/'absent-token'))
+        assert managed.returncode==0,('Managed DATABASE_URL must not fetch ConfigHub',managed.stdout,managed.stderr)
+        assert not (cfg/'notes/prod/secrets.env').exists(),'Managed check must not overwrite local config'
+        assert run(DATABASE_URL='sqlite:///bad',DEPLOYCTL_ENV_FILE=path(snapshot/'.env.json')).returncode!=0
     result=run();assert result.returncode==0,(result.stdout,result.stderr)
     target=cfg/'notes/prod';files=['config.env','secrets.env','.notes-team.json','.database-target']
     before={n:(target/n).read_bytes() for n in files}
@@ -55,11 +84,24 @@ if [[ ${TEST_DB_FAIL:-0} == 1 ]];then echo 'sensitive-db-error' >&2;exit 8;fi
     fixture(secret='failed-rotation')
     assert run(TEST_PUBLISH_FAIL='1').returncode!=0
     assert all((target/n).read_bytes()==data for n,data in before.items()), 'Partial config publication was not restored'
+    if hook:
+        # Bash can enter EXIT with status zero during signal termination.
+        assert run(TEST_SIGNAL_ZERO_STATUS='1').returncode!=0
+        assert all((target/n).read_bytes()==data for n,data in before.items()), 'Zero-status interrupted publication was not restored'
+        assert run(TEST_SIGNAL_FAIL='1').returncode!=0
+        assert all((target/n).read_bytes()==data for n,data in before.items()), 'Interrupted publication was not restored'
     fixture(host='other.example.test');assert run().returncode!=0
     assert all((target/n).read_bytes()==data for n,data in before.items())
-    fixture(secret='rotated');assert run(DATABASE_URL='wrong',APP_ORIGIN='https://wrong.test').returncode==0
+    fixture(secret='rotated');assert run(**({'APP_ORIGIN':'https://wrong.test'} if hook else {'DATABASE_URL':'wrong','APP_ORIGIN':'https://wrong.test'})).returncode==0
     assert b'rotated' in (target/'secrets.env').read_bytes() and b'wrong.test' not in (target/'config.env').read_bytes()
-    assert run('--image','ghcr.io/example/fixture:latest').returncode!=0
-    assert run('--domain','changed.example.com').returncode!=0
+    if hook:
+        assert run(DEPLOYCTL_IMAGE='ghcr.io/example/fixture:latest').returncode!=0
+        assert run(DEPLOYCTL_PARAM_DOMAIN='changed.example.com').returncode!=0
+        assert run(DEPLOYCTL_PARAM_TOKEN_FILE=path(base/'missing')).returncode!=0
+        assert run(DEPLOYCTL_APPLICATION='other').returncode!=0
+        assert run(DEPLOYCTL_PARAM_TOKEN_FILE='').returncode==0
+    else:
+        assert run('--image','ghcr.io/example/fixture:latest').returncode!=0
+        assert run('--domain','changed.example.com').returncode!=0
     if os.name!='nt':assert all((target/n).stat().st_mode&0o777==0o600 for n in files)
 print('PASS: raw container config, URI encoding, secret isolation, Docker DB preflight, failure/partial publication preservation, target/domain pin and password rotation')

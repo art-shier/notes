@@ -10,9 +10,9 @@ notes自己的发布流水线负责测试、Docker镜像构建与标准包生成
 
 图片持久化按当前决定暂缓，升级或重建可能丢失本地图片/导出，后续再接OSS。发布、配置、安装与当前验证边界见 [deployctl部署指南](deploy/OPERATIONS.md)。
 
-部署入口默认域名为 `notes.shier.art`，可通过 `--domain` 覆盖。DNS需指向部署服务器；deployctl方式的HTTPS反向代理需在服务器另行配置。
+部署入口默认域名为 `notes.shier.art`，新版deployctl方式通过 `--set DOMAIN=域名` 覆盖。DNS需指向部署服务器；deployctl方式的HTTPS反向代理需在服务器另行配置。
 
-后续镜像已配置默认 `APP_ORIGIN=https://notes.shier.art`、`COOKIE_SECURE=true`，只将 `DATABASE_URL` 声明为必需配置；可用ctl的 `--env-var` 覆盖默认值。此调整尚未发布，已发布v0.2.0仍使用上面的配置工具准备完整配置。
+新版源码已移除所有安装必填配置。标准包内的pre-install自动从ConfigHub生成 `DATABASE_URL`（包含用户名和密码），采用默认 `APP_ORIGIN=https://notes.shier.art`、`COOKIE_SECURE=true`；不用clone或提前运行prepare。服务器预先安装ConfigHub CLI并准备私有Token文件即可。此流程需要待发布的ctl>=1.6.0及新的Notes包；旧v0.2.0仍需独立配置工具，不能直接使用新步骤。详见部署指南。
 
 ## 原生一行部署（无需 Docker）
 

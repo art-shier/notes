@@ -24,6 +24,9 @@ func env(k, d string) string {
 	return d
 }
 func Load() (Settings, error) {
+	if env("REQUIRE_DATABASE_URL", "false") == "true" && strings.TrimSpace(os.Getenv("DATABASE_URL")) == "" {
+		return Settings{}, fmt.Errorf("DATABASE_URL must be generated before production startup")
+	}
 	s := Settings{DatabaseURL: env("DATABASE_URL", "sqlite:///data/notes.db"), AttachmentsDir: env("ATTACHMENTS_DIR", "data/attachments"), Origin: strings.TrimRight(env("APP_ORIGIN", "http://127.0.0.1:5173"), "/"), CookieSecure: env("COOKIE_SECURE", "false") == "true", WebDir: os.Getenv("WEB_DIR"), Listen: env("LISTEN_ADDR", "127.0.0.1:8000"), QuotaBytes: 1 << 30, UploadLimit: 10 << 20, HistoryLimit: 200, ExportLimit: 2 << 30, ExportConcurrency: 2}
 	s.ExportsDir = env("EXPORTS_DIR", filepath.Join(filepath.Dir(s.AttachmentsDir), "exports"))
 	u, e := url.Parse(s.Origin)

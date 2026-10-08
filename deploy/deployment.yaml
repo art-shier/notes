@@ -13,5 +13,12 @@ health:
 resources:
   memory_limit: 512m
   cpus: 1.0
-required_config:
-- DATABASE_URL
+required_config: []
+hooks:
+  pre_install:
+    script: deploy/hooks/pre-install.sh
+    timeout_seconds: 300
+    refresh_config: true
+  post_install:
+    script: deploy/hooks/post-install.sh
+    timeout_seconds: 120

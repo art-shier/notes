@@ -19,7 +19,9 @@ permissions:
 env:
   RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
   PLATFORM_REPOSITORY: art-shier/deployctl
-  PLATFORM_REF: 803ee2ee974cc1818d84682b2ada84fb19a0ab94
+  PLATFORM_REF: 36faf3e5440e75b6bdff88d6460c128f8f3ec13e
+  CTL_SERVER_URL: ${{ vars.CTL_SERVER_URL || 'https://ctl.shier.art' }}
+  CTL_REGISTRY_HOST: ${{ vars.CTL_REGISTRY_HOST || 'ctl.shier.art' }}
 
 jobs:
   release:
@@ -59,9 +61,20 @@ jobs:
           import os, re
           from pathlib import Path
           from deployctl.contract import read_yaml, validate_deployment, version
+          from deployctl.platform_client import validate_origin
           version(os.environ['RELEASE_VERSION'])
           config = validate_deployment(read_yaml('deploy/deployment.yaml'))
           image_name = os.environ['GITHUB_REPOSITORY'].lower()
+          managed = bool(os.environ.get('CTL_SERVER_URL'))
+          if managed != bool(os.environ.get('CTL_REGISTRY_HOST')):
+              raise SystemExit('Set both CTL_SERVER_URL and CTL_REGISTRY_HOST')
+          registry = os.environ.get('CTL_REGISTRY_HOST', '')
+          if managed:
+              from urllib.parse import urlsplit
+              validate_origin(os.environ['CTL_SERVER_URL'])
+              target = urlsplit('https://' + registry)
+              if target.netloc != registry or not target.hostname or target.username or target.path or target.query or target.fragment:
+                  raise SystemExit('Invalid CTL_REGISTRY_HOST')
           if not re.fullmatch(r'[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)*', image_name):
               raise SystemExit('Invalid image repository')
           for key in ('dockerfile', 'context'):
@@ -72,11 +85,21 @@ jobs:
               print('application=' + config['application'], file=out)
               print('context=source/' + config['build']['context'], file=out)
               print('dockerfile=source/' + config['build']['dockerfile'], file=out)
-              print('image_name=ghcr.io/' + image_name, file=out)
+              print('image_name=' + (registry + '/' + config['application'] if managed else 'ghcr.io/' + image_name), file=out)
           PY
           git show-ref --verify --quiet "refs/tags/$RELEASE_VERSION"
           [[ "$(git rev-parse HEAD)" == "$(git rev-parse "refs/tags/$RELEASE_VERSION^{commit}")" ]]
+      - name: Check ctl publisher credential
+        if: env.CTL_SERVER_URL != ''
+        env:
+          CTL_PUBLISH_TOKEN: ${{ secrets.CTL_PUBLISH_TOKEN }}
+        run: |
+          if [[ -z "$CTL_PUBLISH_TOKEN" ]]; then
+            echo '::error::Set the CTL_PUBLISH_TOKEN repository secret to a Notes publisher token from ctl.'
+            exit 1
+          fi
       - name: Require an unpublished version
+        if: env.CTL_SERVER_URL == ''
         working-directory: source
         env:
           GH_TOKEN: ${{ github.token }}
@@ -86,18 +109,41 @@ jobs:
             echo '::error::This version already has a Release. Use a new project tag.'
             exit 1
           fi
+      - name: Recover a completed ctl publication before rebuilding
+        id: recovery
+        working-directory: source
+        env:
+          PYTHONPATH: ${{ github.workspace }}/platform
+          CTL_PUBLISH_TOKEN: ${{ secrets.CTL_PUBLISH_TOKEN }}
+          APPLICATION: ${{ steps.config.outputs.application }}
+        run: |
+          python deploy/release_delivery.py recover --application "$APPLICATION" \
+            --version "$RELEASE_VERSION" --commit "$(git rev-parse HEAD)" --output dist
       - name: Test Go and Web in their build runtimes
         working-directory: source
-        run: bash notes-server-go/ops/test-release.sh
+        run: |
+          python deploy/build-hooks.py --check
+          python tests/team_package_test.py ../platform
+          bash notes-server-go/ops/test-release.sh
       - uses: docker/setup-qemu-action@v3
+        if: steps.recovery.outputs.recovered != 'true'
       - uses: docker/setup-buildx-action@v3
+        if: steps.recovery.outputs.recovered != 'true'
       - uses: docker/login-action@v3
+        if: env.CTL_SERVER_URL == '' && steps.recovery.outputs.recovered != 'true'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+      - uses: docker/login-action@v3
+        if: env.CTL_SERVER_URL != '' && steps.recovery.outputs.recovered != 'true'
+        with:
+          registry: ${{ env.CTL_REGISTRY_HOST }}
+          username: ctl
+          password: ${{ secrets.CTL_PUBLISH_TOKEN }}
       - name: Build and publish immutable image
         id: image
+        if: steps.recovery.outputs.recovered != 'true'
         uses: docker/build-push-action@v6
         with:
           context: ${{ steps.config.outputs.context }}
@@ -113,24 +159,46 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/platform
           RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
-          IMAGE: ${{ steps.config.outputs.image_name }}@${{ steps.image.outputs.digest }}
+          IMAGE: ${{ steps.recovery.outputs.image || format('{0}@{1}', steps.config.outputs.image_name, steps.image.outputs.digest) }}
+          RECOVERED: ${{ steps.recovery.outputs.recovered }}
         run: |
-          python -m deployctl package --config deploy/deployment.yaml \
-            --image "$IMAGE" --version "$RELEASE_VERSION" \
-            --commit "$(git rev-parse HEAD)" --output dist
+          if [[ "$RECOVERED" != true ]]; then
+            python -m deployctl package --config deploy/deployment.yaml \
+              --image "$IMAGE" --version "$RELEASE_VERSION" \
+              --commit "$(git rev-parse HEAD)" --output dist
+          fi
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+      - name: Publish managed version and advance stable
+        if: env.CTL_SERVER_URL != '' && steps.recovery.outputs.recovered != 'true'
+        working-directory: source
+        env:
+          PYTHONPATH: ${{ github.workspace }}/platform
+          CTL_PUBLISH_TOKEN: ${{ secrets.CTL_PUBLISH_TOKEN }}
+          APPLICATION: ${{ steps.config.outputs.application }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from deployctl.platform_credentials import Credentials
+          target = Path(os.environ['RUNNER_TEMP']) / 'ctl-publisher' / 'client.json'
+          Credentials.save(target, os.environ['CTL_SERVER_URL'], os.environ['CTL_PUBLISH_TOKEN'])
+          PY
+          python -m deployctl publish "$APPLICATION" --version "$RELEASE_VERSION" \
+            --package "dist/${APPLICATION}-${RELEASE_VERSION}.tar.gz" --channel stable \
+            --client-config "$RUNNER_TEMP/ctl-publisher/client.json"
       - name: Publish release archive and SHA-256
         id: publish
         working-directory: source
         env:
           GH_TOKEN: ${{ github.token }}
+          PYTHONPATH: ${{ github.workspace }}/platform
           RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
           APPLICATION: ${{ steps.config.outputs.application }}
           IMAGE: ${{ steps.package.outputs.image }}
         run: |
           PACKAGE="${APPLICATION}-${RELEASE_VERSION}.tar.gz"
-          gh release create "$RELEASE_VERSION" "dist/$PACKAGE" "dist/$PACKAGE.sha256" \
-            --repo "$GITHUB_REPOSITORY" --verify-tag --title "$RELEASE_VERSION" --generate-notes
+          python deploy/release_delivery.py github --repository "$GITHUB_REPOSITORY" \
+            --version "$RELEASE_VERSION" --package "dist/$PACKAGE"
           echo "release_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_VERSION}/${PACKAGE}" >> "$GITHUB_OUTPUT"
           echo "sha256=$(cut -d ' ' -f 1 "dist/$PACKAGE.sha256")" >> "$GITHUB_OUTPUT"
           printf 'Package: %s\n\nSHA256: `%s`\n\nImage: `%s`\n' \
