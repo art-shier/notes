@@ -21,7 +21,7 @@ $env:APP_ORIGIN='http://127.0.0.1:5173'
 
 环境配置沿用 DATABASE_URL、APP_ORIGIN、COOKIE_SECURE、ATTACHMENTS_DIR、EXPORTS_DIR、NOTE_HISTORY_LIMIT、EXPORT_LIMIT_BYTES；Go 增加 LISTEN_ADDR。数据库 URL 使用 `postgresql://`，服务端无需 Python。
 
-推荐根目录 `install-native.sh` 下载 Linux Go/Web，由 systemd 管理非root服务，通过 ConfigHub 连接已有 PostgreSQL，Nginx/Caddy 提供 HTTPS。原生脚本在 `ops/native`；`ops/build-native.sh` 构建 amd64/arm64 Release。刷新配置执行 `sudo bash /opt/shiji/current/ops/native/start.sh`；普通 `systemctl restart shiji` 复用上次配置。详见上级 [原生部署指南](../notes-native-deployment.md)。
+推荐[ctl标准部署](../deploy/CONTROL-PLANE.md)，生产不再依赖ConfigHub。DATABASE_URL存在时优先；否则Go从DB_HOST/DB_USER/DB_PASSWORD组装连接，DB_PORT/DB_NAME/DB_SSLMODE默认5432/notes/require。支持IPv6与特殊凭据安全编码，错误仅包含字段名，生产禁止SQLite回退。原生systemd入口使用私有--env-file或已有service.env，只进行本地配置/数据库预检；详见[原生部署指南](../notes-native-deployment.md)。
 
 也可从本目录使用 Docker Compose；复制 `.env.example` 为 `.env`，配置域名与随机数据库密码。Caddy 终止 HTTPS，Go 同时提供静态 Web 和 `/api/v1`，数据库及私有附件不公开映射。服务端容器包含 PostgreSQL 16 客户端。详见上级 `notes-deployment-guide.md`。
 

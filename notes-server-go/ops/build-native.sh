@@ -17,7 +17,7 @@ for arch in amd64 arm64; do
   mkdir -p -- "$package/web" "$package/ops/native"
   (cd "$root/notes-server-go"; GOOS=linux GOARCH="$arch" CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o "$package/shiji" ./cmd/shiji)
   cp -R -- "$root/notes-web/dist/." "$package/web/"
-  cp -- "$root/notes-server-go/ops/config-hub-lib.sh" "$root/notes-server-go/ops/check.sh" "$package/ops/"
+  cp -- "$root/notes-server-go/ops/check.sh" "$package/ops/"
   cp -- "$root/notes-server-go/ops/native/"*.sh "$root/notes-server-go/ops/native/"*.in "$package/ops/native/"
   printf 'v%s\n' "$version" > "$package/version.txt"
   chmod 755 -- "$package/shiji" "$package/ops/"*.sh "$package/ops/native/"*.sh

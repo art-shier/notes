@@ -100,25 +100,17 @@ try:
     tools = Path('/')/(name+'-fixture')
     tools.mkdir(mode=0o755)
     config.mkdir(mode=0o700)
-    fixture = tools/'config.json'
-    fixture.write_text(json.dumps({'project':'shier','environment':'prod','revision':1,'values':{
-        'db_address':'127.0.0.1','db_port':str(db_port),'notes_db_username':'notes',
-        'notes_db_password':password}}))
+    fixture = tools/'notes.env'
+    fixture.write_text(f'DB_HOST=127.0.0.1\nDB_PORT={db_port}\nDB_USER=notes\nDB_PASSWORD={password}\nDB_NAME=notes\nDB_SSLMODE=require\n')
     fixture.chmod(0o600)
-    cli = tools/'confighub'
-    cli.write_text(f'#!/usr/bin/env bash\n[[ ! -e "{config}/fail" ]] || exit 7\necho pull >> "{config}/pulls"\ncat "{fixture}"\n')
-    cli.chmod(0o755)
-    token = tools/'token'
-    token.write_text('ci-token-placeholder\n')
-    token.chmod(0o600)
     args = ['bash', str(ROOT/'install-native.sh'), '--domain','notes.ci.invalid','--email',email,
             '--version','v0.0.0-ci','--artifact',str(packages/'notes-server_0.0.0-ci_linux_amd64.tar.gz'),
             '--checksum-file',str(packages/'checksums.txt'),'--service-name',name,'--port',str(port),
             '--install-dir',str(install),'--config-dir',str(config),'--data-dir',str(data),
             '--unit-dir',str(unit_dir),
-            '--cli-binary',str(cli),'--token-file',str(token),'--skip-dependencies']
+            '--env-file',str(fixture),'--skip-dependencies']
     # Installer first-deployment guard requires an empty configuration directory.
-    failure = subprocess.run(args+['--token-file',str(tools/'missing-token')],capture_output=True,text=True,timeout=60)
+    failure = subprocess.run(args+['--env-file',str(tools/'missing-env')],capture_output=True,text=True,timeout=60)
     assert failure.returncode != 0 and not (install/'current').exists()
     assert not (config/'service.env').exists()
     # Correcting a first-install typo must remain retryable before target publication.
@@ -183,25 +175,23 @@ try:
     start = ['bash', str(install/'current/ops/native/start.sh'),'--config-dir',str(config)]
     before = hashlib.sha256((config/'service.env').read_bytes()).hexdigest()
     pid = system('show', name+'.service','--property=MainPID','--value')
-    (config/'fail').touch()
+    db('stop','db')
     failure = subprocess.run(start, capture_output=True, text=True, timeout=30)
     assert failure.returncode != 0 and password not in failure.stdout+failure.stderr
     assert hashlib.sha256((config/'service.env').read_bytes()).hexdigest() == before
     assert system('show',name+'.service','--property=MainPID','--value') == pid
-    ready()
     # Simulate boot: stopping the config oneshot invalidates its active state.
     system('stop',name+'.service',name+'-config.service')
     failure = subprocess.run(['systemctl','start',name+'.service'],capture_output=True,text=True,timeout=60)
     assert failure.returncode != 0
     assert system('show',name+'.service','--property=MainPID','--value') == '0'
-    (config/'fail').unlink()
-    pulls = len((config/'pulls').read_text().splitlines())
+    db('up','-d','--wait','--wait-timeout','120')
     system('reset-failed',name+'.service',name+'-config.service')
     system('start',name+'.service')
     ready()
-    assert len((config/'pulls').read_text().splitlines()) > pulls
+    assert hashlib.sha256((config/'service.env').read_bytes()).hexdigest() == before
     assert admin('bootstrap-status') == 'pending'
-    print('PASS: native release/systemd/non-root/TLS PG16, private config/invite, reinstall, unsafe path/snippet rejection, failed upgrade rollback, failed refresh preserves PID/env, boot refresh recovery')
+    print('PASS: native release/systemd/non-root/TLS PG16, private DB fields/invite, reinstall, unsafe path/snippet rejection, failed upgrade rollback, failed preflight preserves PID/env, boot preflight recovery')
 except Exception:
     logs = subprocess.run(['journalctl','-u',name+'.service','-u',name+'-config.service','--no-pager','-n','60'],capture_output=True,text=True)
     print(logs.stdout.replace(password,'[redacted]'))

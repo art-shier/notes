@@ -4,7 +4,7 @@ set -Eeuo pipefail
 umask 077
 domain=notes.shier.art email='' version='' artifact='' checksum_file='' port=8000 service=shiji
 install_dir=/opt/shiji config_dir=/etc/shiji data_dir=/var/lib/shiji unit_dir=/etc/systemd/system
-hub_url=https://config.shier.art hub_project=shier hub_env=prod database=notes token_file='' cli=''
+env_file=''
 skip_dependencies=false stage='' lock='' link_tmp=''
 old_current='' transaction=false restarting=false prior_running=false
 die() { printf '[拾记] %s\n' "$*" >&2; exit 1; }
@@ -60,15 +60,17 @@ trap cleanup EXIT
 while (($#)); do
   case $1 in
     --skip-dependencies) skip_dependencies=true;shift;;
-    --help|-h) echo 'Usage: sudo bash install-native.sh --email admin@example.com [--domain notes.shier.art] [--token-file /private/token] [--port 8000] [--version v0.1.0]';exit;;
-    --domain|--email|--version|--artifact|--checksum-file|--port|--service-name|--install-dir|--config-dir|--data-dir|--unit-dir|--config-hub-url|--config-hub-project|--config-hub-env|--database-name|--token-file|--cli-binary)
+    --help|-h) echo 'Usage: sudo bash install-native.sh --email admin@example.com [--domain notes.shier.art] [--env-file /private/notes.env] [--port 8000] [--version v0.1.0]';exit;;
+    --domain|--email|--version|--artifact|--checksum-file|--port|--service-name|--install-dir|--config-dir|--data-dir|--unit-dir|--env-file)
       (($#>=2)) || die '缺少参数值。'
       case $1 in
         --domain) domain=$2;; --email) email=$2;; --version) version=$2;; --artifact) artifact=$2;; --checksum-file) checksum_file=$2;;
         --port) port=$2;; --service-name) service=$2;; --install-dir) install_dir=$2;; --config-dir) config_dir=$2;; --data-dir) data_dir=$2;; --unit-dir) unit_dir=$2;;
-        --config-hub-url) hub_url=$2;; --config-hub-project) hub_project=$2;; --config-hub-env) hub_env=$2;; --database-name) database=$2;; --token-file) token_file=$2;; --cli-binary) cli=$2;;
+        --env-file) env_file=$2;;
       esac
       shift 2;;
+    --config-hub-url|--config-hub-project|--config-hub-env|--database-name|--token-file|--cli-binary)
+      die 'ConfigHub参数已移除；首次安装使用私有--env-file，已有部署使用service.env。';;
     *) die "未知参数：$1";;
   esac
 done
@@ -108,6 +110,14 @@ if $initial; then
   if systemctl cat "$service.service" >/dev/null 2>&1 || systemctl cat "$service-config.service" >/dev/null 2>&1; then die '系统已存在同名服务，请使用独立 --service-name。';fi
   if getent passwd "$service" >/dev/null; then die '同名OS账号已存在，请使用独立 --service-name。';fi
 fi
+[[ -n $env_file || -f $config_dir/service.env ]] || die '首次安装需要root拥有、权限600的--env-file，包含DATABASE_URL或DB_*。'
+if [[ -n $env_file ]]; then
+  plain_path "$env_file"
+  root_directory_chain "$(dirname -- "$env_file")"
+  [[ -f $env_file && ! -L $env_file && $(stat -c %u "$env_file") == 0 ]] || die '--env-file必须是root拥有的常规文件。'
+  env_mode=$(stat -c %a "$env_file")
+  (( (8#$env_mode & 077) == 0 )) || die '--env-file必须禁止组和其他用户读取。'
+fi
 stage=$(mktemp -d /tmp/notes-native-install.XXXXXX)
 case $(uname -m) in x86_64|amd64) arch=amd64;; aarch64|arm64) arch=arm64;; *) die '只支持Linux amd64/arm64。';;esac
 if [[ -z $version ]]; then
@@ -135,6 +145,7 @@ done < "$stage/list"
 while IFS= read -r entry; do [[ ${entry:0:1} == - || ${entry:0:1} == d ]] || die '运行包不能包含链接或设备。';done < "$stage/types"
 mkdir -- "$stage/package";tar --no-same-owner -xzf "$stage/$name" -C "$stage/package"
 [[ -x $stage/package/shiji && -f $stage/package/web/index.html && -f $stage/package/ops/native/prepare.sh && $(cat "$stage/package/version.txt") == "$version" ]] || die '运行包不完整。'
+grep -q -- '--env-file)' "$stage/package/ops/native/prepare.sh" || die '该原生运行包仍使用旧配置入口，请选择支持私有--env-file的新版本。'
 mkdir -p -- "$install_dir" "$install_dir/releases" "$install_dir/tools"
 chmod 755 -- "$install_dir" "$install_dir/releases" "$install_dir/tools"
 mkdir -- "$install_dir/.install.lock" 2>/dev/null || die '另一个原生安装正在运行。';lock="$install_dir/.install.lock"
@@ -153,19 +164,10 @@ if ! getent passwd "$service" >/dev/null; then useradd --system --user-group --n
 mkdir -p -- "$config_dir" "$data_dir" "$data_dir/attachments" "$data_dir/exports" "$unit_dir"
 chmod 700 -- "$config_dir";chmod 750 -- "$data_dir";chmod 700 -- "$data_dir/attachments" "$data_dir/exports"
 chown -- "$service:$service" "$data_dir" "$data_dir/attachments" "$data_dir/exports"
-if [[ -z $cli ]]; then cli=$(command -v confighub || true);fi
-if [[ -z $cli && -x $install_dir/tools/confighub ]]; then cli="$install_dir/tools/confighub";fi
-if [[ -z $cli ]]; then
-  curl --fail --silent --show-error --proto '=https' https://raw.githubusercontent.com/art-shier/config-hub/main/scripts/install-cli.sh -o "$stage/install-cli.sh"
-  bash "$stage/install-cli.sh" --install-dir "$install_dir/tools"
-  cli="$install_dir/tools/confighub"
-fi
-plain_path "$cli";[[ -x $cli && -f $cli ]] || die 'ConfigHub CLI不可用。'
-if [[ -f $config_dir/native.json && -z $token_file ]]; then token_file=$(jq -er '.token_file | select(type=="string")' "$config_dir/native.json");fi
-jq -n --arg domain "$domain" --arg port "$port" --arg user "$service" --arg install "$install_dir" --arg data "$data_dir" --arg url "$hub_url" --arg project "$hub_project" --arg env "$hub_env" --arg db "$database" --arg cli "$cli" --arg token "$token_file" '{domain:$domain,port:$port,service_user:$user,install_dir:$install,data_dir:$data,hub_url:$url,hub_project:$project,hub_env:$env,database:$db,cli:$cli,token_file:$token}' > "$stage/native.json"
+jq -n --arg domain "$domain" --arg port "$port" --arg user "$service" --arg install "$install_dir" --arg data "$data_dir" '{domain:$domain,port:$port,service_user:$user,install_dir:$install,data_dir:$data}' > "$stage/native.json"
 if [[ -e $config_dir/native.json ]]; then
   [[ ! -L $config_dir/native.json ]] || die '原生元数据不能是链接。'
-  jq -S . "$config_dir/native.json" > "$stage/saved";jq -S . "$stage/native.json" > "$stage/proposed"
+  jq -S '{domain,port,service_user,install_dir,data_dir}' "$config_dir/native.json" > "$stage/saved";jq -S . "$stage/native.json" > "$stage/proposed"
   if ! cmp -s -- "$stage/saved" "$stage/proposed"; then
     # A failed first preflight has never published or used this target.
     if [[ ! -e $install_dir/current && ! -L $install_dir/current && ! -e $config_dir/service.env && ! -e $config_dir/.database-target ]]; then
@@ -229,8 +231,10 @@ done
 [[ ! -L $install_dir/.rollback-current && ! -e $install_dir/.rollback-current ]] || die '回退链接路径已占用。'
 if systemctl is-active --quiet "$service.service"; then prior_running=true;fi
 transaction=true
-# All remote/DB validation completes while an existing application keeps running.
-bash "$release/ops/native/prepare.sh" --config-dir "$config_dir" --binary "$release/shiji"
+# Validate the supplied local configuration while an existing app keeps running.
+prepare_args=(--config-dir "$config_dir" --binary "$release/shiji")
+[[ -z $env_file ]] || prepare_args+=(--env-file "$env_file")
+bash "$release/ops/native/prepare.sh" "${prepare_args[@]}"
 link_tmp=$(mktemp "$install_dir/.current.XXXXXX");rm -f -- "$link_tmp";ln -s -- "$release" "$link_tmp";mv -Tf -- "$link_tmp" "$install_dir/current";link_tmp=''
 install -m 644 -- "$stage/shiji.service" "$unit_dir/$service.service"
 install -m 644 -- "$stage/shiji-config.service" "$unit_dir/$service-config.service"

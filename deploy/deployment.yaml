@@ -18,7 +18,7 @@ hooks:
   pre_install:
     script: deploy/hooks/pre-install.sh
     timeout_seconds: 300
-    refresh_config: true
+    refresh_config: false
   post_install:
     script: deploy/hooks/post-install.sh
     timeout_seconds: 120

@@ -1,116 +1,46 @@
-# Notes：deployctl 部署
+# Notes：ctl部署与运维
 
-ctl1.7.0管理台/托管Registry接入见 [平台模式](CONTROL-PLANE.md)；本页保留原发布包与ConfigHub安装入口。
+推荐[ctl平台模式](CONTROL-PLANE.md)。项目notes，默认环境prod，绑定127.0.0.1:8000，就绪接口 `/api/v1/health/ready`。PostgreSQL及HTTPS代理外置。
 
-application为notes，默认环境prod，主机127.0.0.1:8000，就绪接口 `/api/v1/health/ready`。默认域名为 `notes.shier.art`；管理模式自定义域名在管理台设置 `APP_ORIGIN=https://域名`，`--set DOMAIN=域名` 仅在最终生效的DATABASE_URL为空、执行ConfigHub回退时生成APP_ORIGIN。Go/Web使用现有Dockerfile；PostgreSQL与HTTPS代理外置。
+## 数据库配置
 
-## ConfigHub 自动配置流程（v0.3.3）
+在ctl配置中选择一种形式：
 
-首选 [ctl 平台模式](CONTROL-PLANE.md)：在管理台配置有效的秘密 DATABASE_URL，服务器登录后执行 `sudo ctl install notes --prod`，pre 会直接检查连接。以下是未提供连接时的 ConfigHub 回退流程。
-
-不用填写DATABASE_URL、用户名、密码或提前下载prepare脚本。服务器需Linux、Python>=3.10、Docker Engine、Compose>=2.30、jq、ConfigHub CLI。pre直接调用ConfigHub，使用执行安装的用户已有CLI登录配置，不默认读取 `/root/shier-prod.token`，无需传 `--set TOKEN_FILE=`。如果安装通过sudo执行，ConfigHub使用sudo后的用户配置；ctl登录凭据和ConfigHub登录凭据分别由各自CLI管理。
-
-新包要求ctl>=1.6.0配置回读能力，当前使用ctl>=1.7.0；v1.5.0不支持此流程。使用 [v0.3.3 Release](https://github.com/art-shier/notes/releases/tag/v0.3.3) 提供的真实RELEASE_URL与SHA256：
-
-```bash
-sudo deployctl install notes --env prod --release "$RELEASE_URL" --sha256 "$SHA256"
-# 可选：指定私有token文件、自定义域名和首个管理员邮箱
-sudo deployctl install notes --env prod --release "$RELEASE_URL" --sha256 "$SHA256" \
-  --set TOKEN_FILE=/root/shier-prod.token --set DOMAIN=notes.shier.art --set ADMIN_EMAIL=you@example.com
-```
-
-以上两个install是替代示例；已有安装用upgrade，同版本也可重新拉取配置。安装参数只作用于本次，使用自定义参数时每次升级都需传相同值。默认ConfigHub是 `https://config.shier.art` 的 `shier/prod`，数据库notes；需要覆盖时用 `--set CONFIG_HUB_URL=...`、CONFIG_HUB_PROJECT、CONFIG_HUB_ENV、DATABASE_NAME或CLI_BINARY。
-
-执行顺序：验证标准包与镜像 → pre读取ConfigHub、字段校验/URI编码、只读数据库检查 → 写私有config.env/secrets.env → ctl回读并创建新运行快照 → Go迁移/启动/就绪检查 → post查询账户状态 → 提交成功。新镜像缺失DATABASE_URL会停止启动，避免悄悄使用SQLite。
-
-主机/端口优先notes_db_address/notes_db_port，回退db_address/db_port；账号优先notes_db_username/notes_db_password，回退共享字段。不会重复手工配置地址和端口。仅连接已创建的notes库，不创建数据库/账号。配置来源、域名及数据库目标固定，密码可经预检更新；读取失败、预检失败或部分写入失败保留原配置。
-
-`--set DOMAIN`会生成对应APP_ORIGIN；已有显式env-var覆盖优先，修改域名还需调整或移除旧APP_ORIGIN override。数据库URL保存在服务器600的secrets.env与受保护的运行快照，不进入默认配置、包或普通日志。可选TOKEN_FILE只作为参数传给宿主机ConfigHub CLI，Notes不提前检查认证文件，也不注入应用。ConfigHub调用失败时保留原始stderr和退出码；查看ctl提示的受保护hook日志即可看到实际错误。返回JSON或数据库字段无效会单独报字段校验错误；成功导出的配置不写入日志。
-
-post只在账户状态empty且传入ADMIN_EMAIL时生成邀请，pending/registered保持现状。邀请仅在服务器600的hook日志中，可由管理员读取 `/etc/deployctl/notes/prod/hook-logs/`；不自动回显到部署命令。
-
-pre失败不替换旧服务；启动/就绪/post失败恢复旧成功快照和版本。回滚不重跑hooks，也不撤销数据库迁移、邀请或原始配置文件变更。restart使用上次成功快照；upgrade重新拉取管理台配置。ConfigHub仅在最终生效的DATABASE_URL为空时读取；已有config.env/secrets.env中生成的连接也会走直接预检分支，普通upgrade不会自动刷新ConfigHub。
-
-下面的v0.2.0步骤保留为旧版本安装入口。
-
-## 已发布版本与后续发布
-
-notes自己的 `.github/workflows/release.yml` 完成测试、双架构镜像构建与标准包生成。新版构建与CI使用工作流中固定的配置回读平台源码SHA，无需 `PLATFORM_READ_TOKEN`。新版默认发布到 `https://ctl.shier.art`，镜像仓库默认 `ctl.shier.art`；GitHub Variables中的 `CTL_SERVER_URL`、`CTL_REGISTRY_HOST` 可覆盖这两个值，未配置或为空时分别使用默认值。推送托管镜像与登记版本使用必填的 `CTL_PUBLISH_TOKEN`，GitHub Release下载入口继续使用Actions提供的 `GITHUB_TOKEN`。
-
-v0.2.0已发布，标准包内四文件由deployctl生成。发布提交为 `35ff869f089c11db4ba02f0b818f9641b0169d35`；随后单独发布配置工具，源提交 `a32f7574bc60d9fac3469c0a7974a83c2f4b1668`，包括默认域名修改。配置工具为Release附加资产，与标准包分开，不手改Compose。
-
-v0.3.2使用自包含pre/post hook，优先检查托管的数据库连接，未提供时自动生成，required_config为空。配置回读能力已包含在ctl1.7.0中。
-
-v0.3.3取消默认Token文件和Notes侧认证预检查，直接使用ConfigHub CLI已有登录配置，并保留调用失败的原始错误及退出码。
-
-| 产物 | 地址 / 摘要 |
+| 字段 | 用途 |
 |---|---|
-| 标准包 | [notes-v0.2.0.tar.gz](https://github.com/art-shier/notes/releases/download/v0.2.0/notes-v0.2.0.tar.gz) |
-| 标准包SHA256 | `e58726a47620d97b5f5eb5c4432e58a8ad498499153c289bf29581a330f8622a` |
-| 镜像 | `ghcr.io/art-shier/notes@sha256:d569f05d9f00890335e40b38922d70cf754a1ee3ffae5ec96343ab0af59f8373` |
-| 配置工具 | [notes-config-a32f757.tar.gz](https://github.com/art-shier/notes/releases/download/v0.2.0/notes-config-a32f757.tar.gz) |
-| 配置工具SHA256 | `9f86961dcd9f385be4e794f82eeebb1c3738ea0e0b09db5a39fc494593d758d7` |
+| DATABASE_URL | 完整PostgreSQL URL；存在时优先于全部DB_* |
+| DB_HOST | 实例主机名、IPv4或IPv6 |
+| DB_PORT | 默认5432 |
+| DB_USER | Notes专用账号，必填 |
+| DB_PASSWORD | 专用密码，秘密字段，必填 |
+| DB_NAME | 默认notes |
+| DB_SSLMODE | 默认require，也支持verify-ca、verify-full |
 
-后续新增v*标签或手动选择已有未发布标签可触发发布，需先取得相应发布授权。发布成功后在Actions摘要查看真实image digest、包URL与SHA256。配置工具是本次单独打包上传的附加文件，后续更新需从相应受检源码生成并校验，不能覆盖同名产物。
+可以在ctl组环境中共享DB_HOST/DB_PORT/DB_SSLMODE，在notes项目环境中覆盖DB_USER/DB_PASSWORD/DB_NAME。Go读取ctl最终快照，只有DATABASE_URL缺失时才拼接并URI编码。缺少字段或字段无效时只报告字段名，生产不回退SQLite。独立数据库及账号必须预先存在；安装不会创建数据库或自动迁移其他部署的数据。
 
-原生工作流改为 `release-native.yml` 手动触发，可为已有Release追加原生资产，不覆盖已有文件；原生installer只选择含匹配运行包的稳定版本。
+旧私有config.env/secrets.env不会被hook改写。已有DATABASE_URL继续有效；改用DB_*时应先核对最终配置中是否仍有DATABASE_URL。数据库切换需另行备份及迁移，不能将应用回滚视为数据库回滚。
 
-## v0.2.0 服务器与配置（旧流程）
-
-需要Linux、Python>=3.10、deployctl>=1.2、Docker Engine、Compose>=2.30、jq、ConfigHub CLI。HTTPS由现有Nginx/Caddy代理至127.0.0.1:8000。代码仓库公开不代表GHCR镜像公开：服务器需要镜像拉取权限，或发布者将镜像设为公开。
-
-准备root所有、权限600的 `/root/shier-prod.token`，数据库沿用ConfigHub的shier/prod与notes专用账号。无需clone源码：在Bash中下载已发布的小配置包，校验后解压到独立root目录，再生成配置：
+## 安装与升级
 
 ```bash
-set -euo pipefail
-curl -fL --proto '=https' https://github.com/art-shier/notes/releases/download/v0.2.0/notes-config-a32f757.tar.gz -o notes-config-a32f757.tar.gz
-echo '9f86961dcd9f385be4e794f82eeebb1c3738ea0e0b09db5a39fc494593d758d7  notes-config-a32f757.tar.gz' | sha256sum -c -
-sudo mkdir -p /opt/notes-config-a32f757
-sudo tar --no-same-owner -xzf notes-config-a32f757.tar.gz -C /opt/notes-config-a32f757
-IMAGE='ghcr.io/art-shier/notes@sha256:d569f05d9f00890335e40b38922d70cf754a1ee3ffae5ec96343ab0af59f8373'
-sudo bash /opt/notes-config-a32f757/deploy/prepare.sh --image "$IMAGE" --token-file /root/shier-prod.token
-# 默认notes.shier.art；其他域名在prepare参数中追加 --domain 域名
+sudo ctl login --server https://ctl.shier.art
+sudo ctl install notes --prod
+sudo ctl upgrade notes --prod
+sudo ctl status notes --prod
 ```
 
-准备脚本先拉取/校验/URI编码，再用指定镜像执行只读database-check，成功后生成 `/etc/deployctl/notes/prod/config.env`、secrets.env（600、raw、不加shell引号）。使用0.0.0.0:8000及/app、/data容器路径；失败保留原配置，域名/配置来源/数据库目标锁定，密码可经检查更新。它不安装/重启服务、不创建数据库、不输出凭据。
+自定义端口使用--port；域名在ctl设置APP_ORIGIN=https://你的域名。镜像默认APP_ORIGIN=https://notes.shier.art、COOKIE_SECURE=true。首次邀请可加--set ADMIN_EMAIL=you@example.com。post仅在账户状态empty时生成邀请；已有邀请或账户保持现状。邀请记录在ctl私有hook日志。
 
-## v0.2.0 安装与运维（旧流程）
+执行顺序：ctl获取配置和不可变镜像 → pre用最终effective.env执行只读database-check → Go迁移/启动/就绪 → post账户检查 → 提交成功。pre/post辅助容器使用已拉取digest及--pull never，数据库检查失败阻止替换旧服务。pre不生成文件，refresh_config关闭；服务器无需ConfigHub CLI或Token。
 
-v0.2.0的真实包地址和SHA256如下。先查询状态；未安装用install，已安装用upgrade。transaction非空先诊断，不能继续升级：
+启动/就绪/post失败恢复旧成功版本与快照；restart复用成功快照，upgrade重新获取ctl配置。回滚不撤销数据库迁移或邀请。
 
-```bash
-RELEASE_URL='https://github.com/art-shier/notes/releases/download/v0.2.0/notes-v0.2.0.tar.gz'
-SHA256='e58726a47620d97b5f5eb5c4432e58a8ad498499153c289bf29581a330f8622a'
-sudo deployctl status notes --env prod
-```
+## 发布与旧入口
 
-未安装时执行：
+Notes自己的release.yml测试并构建AMD64/ARM64镜像，发布到ctl托管Registry并登记stable。GitHub变量CTL_SERVER_URL/CTL_REGISTRY_HOST可覆盖默认地址，必需秘密CTL_PUBLISH_TOKEN；版本包和SHA256仍提供GitHub Release下载。发布中断恢复原始同版本包，不覆盖不同资产。
 
-```bash
-sudo deployctl install notes --env prod --release "$RELEASE_URL" --sha256 "$SHA256"
-sudo deployctl status notes --env prod
-curl -fsS http://127.0.0.1:8000/api/v1/health/ready
-```
-
-已安装且目标版本较旧时，先完整备份、重新prepare，再执行upgrade：
-
-```bash
-sudo deployctl upgrade notes --env prod --release "$RELEASE_URL" --sha256 "$SHA256"
-sudo deployctl status notes --env prod
-curl -fsS http://127.0.0.1:8000/api/v1/health/ready
-```
-
-目标版本就绪且transaction为空才是部署成功。镜像启动时执行Go迁移；应用回滚不回滚数据库/配置。原生/旧Compose实例不自动停止或迁移附件，切换前停止所有写入者并保留完整备份。
-
-新库就绪后使用同一image和配置执行CLI，bootstrap-status为empty时才生成管理员邀请（已有账户不重复初始化）：
-
-```bash
-sudo docker run --rm --entrypoint shiji --env-file /etc/deployctl/notes/prod/config.env --env-file /etc/deployctl/notes/prod/secrets.env "$IMAGE" bootstrap-status
-sudo docker run --rm --entrypoint shiji --env-file /etc/deployctl/notes/prod/config.env --env-file /etc/deployctl/notes/prod/secrets.env "$IMAGE" bootstrap --email you@example.com
-```
-
-通过已配置HTTPS域名打开邀请，没有默认密码或公开注册。其他运维通过deployctl status/logs/rollback；回滚在对应授权下执行，不删除state.json。自定义环境/配置根时prepare与deployctl保持相同选项。
+已发布的v0.2.0–v0.3.3包内容保持原样。当前源码移除了ConfigHub回退；deploy/prepare.sh只给出迁移到ctl配置的提示，不写文件。旧ConfigHub安装参数不再接受。独立Compose的既有私有.env和原生service.env仍可本地预检/启动，不读取旧ConfigHub metadata中的CLI或Token。
 
 ## 当前图片边界
 
-用户决定暂缓持久卷/OSS。图片与导出暂存容器可写层：同一容器restart通常保留，升级/重建/回滚重建可能丢失，数据库记录不包含原图片文件。当前适合验证文字笔记/API及临时图片；重要图片继续保留原部署备份，后续再接OSS。尚未操作生产服务器。
+用户决定暂缓持久卷/OSS。托管包图片与导出暂存容器可写层，升级/重建/回滚可能丢失；数据库记录不含原图片文件。保留重要图片的原部署备份，OSS接入单独实施。

@@ -2,18 +2,17 @@
 # Linux installer for https://github.com/art-shier/notes
 set -Eeuo pipefail
 umask 077
-unset DATABASE_URL DOMAIN COMPOSE_FILE COMPOSE_PROJECT_NAME COMPOSE_ENV_FILES COMPOSE_PROFILES POSTGRES_PASSWORD NOTE_HISTORY_LIMIT EXPORT_LIMIT_BYTES
+unset DATABASE_URL DB_HOST DB_PORT DB_USER DB_PASSWORD DB_NAME DB_SSLMODE DOMAIN COMPOSE_FILE COMPOSE_PROJECT_NAME COMPOSE_ENV_FILES COMPOSE_PROFILES POSTGRES_PASSWORD NOTE_HISTORY_LIMIT EXPORT_LIMIT_BYTES
 REPO=https://github.com/art-shier/notes.git
 DOMAIN=notes.shier.art ADMIN_EMAIL='' INSTALL_DIR="${HOME}/notes" PROJECT=shiji
-CONFIG_HUB=false HUB_URL=https://config.shier.art HUB_PROJECT='' HUB_ENV='' DATABASE_NAME='' TOKEN_FILE=''
-HUB_URL_SET=false
-lock='' env_tmp='' askpass='' cli_setup=''
+EXTERNAL_DATABASE=false
+lock='' env_tmp='' askpass=''
 say() { printf '\n[拾记] %s\n' "$*"; }
 die() { printf '\n[拾记] %s\n' "$*" >&2; exit 1; }
 usage() {
   cat <<'HELP'
 Usage: bash install.sh --email admin@example.com [--domain notes.shier.art] [--dir /path/notes] [--project shiji]
-External database: add --config-hub --config-hub-project shier --config-hub-env prod [--database-name notes] [--token-file /private/token]
+External database: configure notes in ctl; existing private .env deployments remain usable.
 Linux server; domain must resolve to this server, TCP 80/443 must be available.
 Existing configuration and persistent Docker volumes are preserved.
 HELP
@@ -22,20 +21,17 @@ cleanup() {
   local status=$?
   [[ -z $env_tmp ]] || rm -f -- "$env_tmp"
   [[ -z $askpass ]] || rm -f -- "$askpass"
-  [[ -z $cli_setup ]] || rm -f -- "$cli_setup"
   [[ -z $lock ]] || rmdir -- "$lock" 2>/dev/null || true
   if ((status)); then printf '\n[拾记] 部署中断；已有数据和容器保留。修复错误后可再次执行相同命令。\n' >&2; fi
 }
 trap cleanup EXIT
 while (($#)); do
   case $1 in
-    --config-hub) CONFIG_HUB=true; shift;;
-    --domain|--email|--dir|--project|--config-hub-url|--config-hub-project|--config-hub-env|--database-name|--token-file)
+    --config-hub|--config-hub-url|--config-hub-project|--config-hub-env|--database-name|--token-file)
+      die 'ConfigHub安装参数已移除；请在ctl配置DATABASE_URL或DB_*。';;
+    --domain|--email|--dir|--project)
       (($#>=2)) || die "$1 缺少参数。"
-      case $1 in --domain) DOMAIN=$2;; --email) ADMIN_EMAIL=$2;; --dir) INSTALL_DIR=$2;; --project) PROJECT=$2;;
-        --config-hub-url) HUB_URL=$2; HUB_URL_SET=true; CONFIG_HUB=true;; --config-hub-project) HUB_PROJECT=$2; CONFIG_HUB=true;;
-        --config-hub-env) HUB_ENV=$2; CONFIG_HUB=true;; --database-name) DATABASE_NAME=$2; CONFIG_HUB=true;;
-        --token-file) TOKEN_FILE=$2; CONFIG_HUB=true;; esac
+      case $1 in --domain) DOMAIN=$2;; --email) ADMIN_EMAIL=$2;; --dir) INSTALL_DIR=$2;; --project) PROJECT=$2;; esac
       shift 2;;
     -h|--help) usage; exit 0;;
     *) usage >&2; die "未知参数：$1";;
@@ -130,33 +126,6 @@ if ! "${DOCKER[@]}" compose version >/dev/null 2>&1; then
 fi
 
 ENV_FILE="$SERVER_DIR/.env"
-if [[ -e $SERVER_DIR/.config-hub.json ]]; then CONFIG_HUB=true; fi
-if $CONFIG_HUB; then
-  [[ -f $SERVER_DIR/ops/start.sh ]] || die '已有代码尚不支持 ConfigHub；先备份并 git pull --ff-only，或使用新目录。'
-  command -v jq >/dev/null || apt_install jq
-  cli_binary=$(command -v confighub || true)
-  if [[ -z $cli_binary && -x $INSTALL_DIR/.tools/confighub ]]; then cli_binary="$INSTALL_DIR/.tools/confighub"; fi
-  if [[ -z $cli_binary ]]; then
-    say '安装 ConfigHub 官方 CLI（Release 下载并校验 SHA-256）'
-    cli_setup=$(mktemp)
-    curl --fail --silent --show-error --proto '=https' https://raw.githubusercontent.com/art-shier/config-hub/main/scripts/install-cli.sh -o "$cli_setup"
-    bash "$cli_setup" --install-dir "$INSTALL_DIR/.tools"
-    rm -f -- "$cli_setup"; cli_setup=''
-    cli_binary="$INSTALL_DIR/.tools/confighub"
-  fi
-  start_args=(--domain "$DOMAIN" --project "$PROJECT" --cli-binary "$cli_binary")
-  if [[ ! -f $SERVER_DIR/.config-hub.json ]] || $HUB_URL_SET; then start_args+=(--config-hub-url "$HUB_URL"); fi
-  [[ -z $HUB_PROJECT ]] || start_args+=(--config-hub-project "$HUB_PROJECT")
-  [[ -z $HUB_ENV ]] || start_args+=(--config-hub-env "$HUB_ENV")
-  [[ -z $DATABASE_NAME ]] || start_args+=(--database-name "$DATABASE_NAME")
-  [[ -z $TOKEN_FILE ]] || start_args+=(--token-file "$TOKEN_FILE")
-  # start.sh owns the same lock while fetching/building/publishing configuration.
-  rmdir -- "$lock"; lock=''
-  bash "$SERVER_DIR/ops/start.sh" "${start_args[@]}"
-  # Account initialization remains serialized with subsequent installer runs.
-  mkdir -- "$SERVER_DIR/.install.lock" 2>/dev/null || die '另一个安装/启动正在运行；请稍后重试。'
-  lock="$SERVER_DIR/.install.lock"
-else
 if [[ -e $ENV_FILE || -L $ENV_FILE ]]; then
   [[ -f $ENV_FILE && ! -L $ENV_FILE ]] || die '.env 不是安全的常规文件。'
   configured_domain=$(sed -n 's/^DOMAIN=//p' "$ENV_FILE")
@@ -176,15 +145,18 @@ COMPOSE=("${DOCKER[@]}" compose --project-directory "$SERVER_DIR" --env-file "$E
 "${COMPOSE[@]}" config --quiet
 say '构建 Web 与 Go 服务；首次构建可能需要数分钟'
 "${COMPOSE[@]}" build --pull app
-say '启动 PostgreSQL、Go 服务与 HTTPS 入口'
-"${COMPOSE[@]}" up -d --wait --wait-timeout 180
+say '启动 Go 服务与 HTTPS 入口'
+if grep -qx 'COMPOSE_FILE=compose.external.yaml' "$ENV_FILE"; then
+  EXTERNAL_DATABASE=true
+  "${COMPOSE[@]}" run --rm --no-deps --entrypoint shiji app database-check || die '外部数据库预检失败，已有服务保留。'
 fi
+"${COMPOSE[@]}" up -d --wait --wait-timeout 180
 COMPOSE=("${DOCKER[@]}" compose --project-directory "$SERVER_DIR" --env-file "$ENV_FILE")
 say "等待 HTTPS 就绪：https://$DOMAIN"
 health=$(curl --fail --silent --show-error --proto '=https' --retry 20 --retry-delay 3 --retry-all-errors --max-time 10 "https://$DOMAIN/api/v1/health/ready") || die 'HTTPS 未就绪；请检查域名解析、80/443端口和 Caddy 日志。服务与数据保留。'
 [[ $health == '{"status":"ready"}' ]] || die 'HTTPS 返回内容不是拾记就绪响应。'
 if ! state=$("${COMPOSE[@]}" exec -T app shiji bootstrap-status 2>/dev/null); then
-  if $CONFIG_HUB; then die '账户初始化检查失败；请确认已更新 Go 服务代码。'; fi
+  if $EXTERNAL_DATABASE; then die '账户初始化检查失败；请确认已更新 Go 服务代码。'; fi
   # Existing standalone checkouts are not pulled automatically; older binaries
   # retain their database-side initialization check until the operator upgrades.
   state=$("${COMPOSE[@]}" exec -T db psql -U notes -d notes -At -c "SELECT CASE WHEN EXISTS(SELECT 1 FROM users) THEN 'registered' WHEN EXISTS(SELECT 1 FROM invitations WHERE role='admin' AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP AT TIME ZONE 'UTC') THEN 'pending' ELSE 'empty' END;") || die '账户初始化检查失败。'
