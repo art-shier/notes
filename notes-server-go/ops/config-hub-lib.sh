@@ -4,7 +4,7 @@
 shiji_read_database() {
   local stage=$1 hub_project=$2 hub_env=$3 database=$4
   shift 4
-  "$@" export --project "$hub_project" --env "$hub_env" --format json > "$stage/config.json" || return 1
+  "$@" export --project "$hub_project" --env "$hub_env" --format json > "$stage/config.json" || return $?
   jq -e --arg database "$database" --arg project "$hub_project" --arg environment "$hub_env" '
     select(.project == $project and .environment == $environment) | .values as $v |
     {host: ($v.notes_db_address // $v.db_address), port: (($v.notes_db_port // $v.db_port) | tostring),
@@ -17,6 +17,9 @@ shiji_read_database() {
     select(.sslmode == "require" or .sslmode == "verify-ca" or .sslmode == "verify-full") |
     (if (.host | contains(":")) and (.host | startswith("[") | not) then "[" + .host + "]" else .host end) as $host |
     . + {uri: ("postgresql://" + (.user | @uri) + ":" + (.password | @uri) + "@" + $host + ":" + .port + "/" + .database + "?sslmode=" + .sslmode + "&connect_timeout=10")}
-  ' "$stage/config.json" > "$stage/database.json" 2>/dev/null || return 1
+  ' "$stage/config.json" > "$stage/database.json" 2>/dev/null || {
+    printf '[拾记] ConfigHub返回的配置格式或数据库字段无效，保留原配置。\n' >&2
+    return 1
+  }
   jq -c '{host, port, user, database}' "$stage/database.json" > "$stage/target"
 }

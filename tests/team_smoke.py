@@ -47,8 +47,7 @@ folder=base/'config/notes'/deploy_env
 certs=base/'certs';certs.mkdir(mode=0o755)
 cli=base/'confighub';payload=base/'hub.json';failure_marker=base/'fetch-failed'
 cli.write_text(f'#!/usr/bin/env bash\n[[ ! -e {failure_marker} ]] || exit 7\ncat {payload}\n');cli.chmod(0o700)
-token=base/'token';token.write_text('fixture-only');token.chmod(0o600)
-params={'CLI_BINARY':str(cli),'TOKEN_FILE':str(token)}
+params={'CLI_BINARY':str(cli)}
 try:
     gateway=run(['docker','network','inspect','bridge','--format','{{(index .IPAM.Config 0).Gateway}}'])
     run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=notes-ci','-keyout',certs/'server.key','-out',certs/'server.crt'])

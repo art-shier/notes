@@ -21,7 +21,16 @@ with tempfile.TemporaryDirectory(prefix='notes-team-config-',dir=ROOT.parent) as
     scripts={
         'uname':'echo Linux\n','id':'echo 0\n',
         'stat':'case "$*" in *%a*) echo 600;; *) echo 0;; esac\n',
-        'confighub':'[[ ${TEST_FETCH_FAIL:-0} != 1 ]] || exit 9;cat "$TEST_VALUES"\n',
+        'confighub':'''printf '%s\\n' "$@" > "$TEST_CLI_LOG"
+if [[ ${TEST_FETCH_FAIL:-0} == 1 ]];then echo 'ConfigHub: fixture authentication rejected' >&2;exit 9;fi
+while (($#));do
+  if [[ $1 == --token-file ]];then
+    [[ -f $2 ]] || { echo 'ConfigHub: fixture token file missing' >&2;exit 7; }
+    shift 2
+  else shift;fi
+done
+cat "$TEST_VALUES"
+''',
         'mv':'if [[ ${TEST_PUBLISH_FAIL:-0} == 1 && "${@: -1}" == */.notes-team.json ]];then exit 9;fi;exec /usr/bin/mv "$@"\n',
         'docker':'''[[ $1 == run ]] || exit 2
 echo check >> "$TEST_LOG"
@@ -54,13 +63,12 @@ if [[ ${TEST_DB_FAIL:-0} == 1 ]];then echo 'sensitive-db-error' >&2;exit 8;fi
             'mv -Tf -- "$stage/config.env" "$config_dir/config.env"\n'
             'if [[ ${TEST_SIGNAL_ZERO_STATUS:-0} == 1 ]];then trap - EXIT;cleanup;exit 143;fi\n'
             'if [[ ${TEST_SIGNAL_FAIL:-0} == 1 ]];then kill -TERM $$;fi'),encoding='utf-8',newline='\n')
-        token=base/'token';token.write_text('fixture-token',encoding='utf-8');token.chmod(0o600)
         hook_env={'DEPLOYCTL_APPLICATION':'notes','DEPLOYCTL_ENVIRONMENT':'prod',
             'DEPLOYCTL_IMAGE':image,'DEPLOYCTL_CONFIG_DIR':path(cfg/'notes/prod'),
-            'DEPLOYCTL_PARAM_CLI_BINARY':path(bins/'confighub'),'DEPLOYCTL_PARAM_TOKEN_FILE':path(token)}
+            'DEPLOYCTL_PARAM_CLI_BINARY':path(bins/'confighub')}
         args=[]
     def run(*extra,**overrides):
-        env={**os.environ,'TEST_BIN':str(bins).replace('\\','/'),'TEST_VALUES':str(values).replace('\\','/'),'TEST_LOG':str(log).replace('\\','/'),**hook_env,**overrides}
+        env={**os.environ,'TEST_BIN':str(bins).replace('\\','/'),'TEST_VALUES':str(values).replace('\\','/'),'TEST_LOG':str(log).replace('\\','/'),'TEST_CLI_LOG':str(base/'cli.log').replace('\\','/'),**hook_env,**overrides}
         script=('export PATH="$(cygpath -u "$TEST_BIN"):$PATH"; ' if os.name=='nt' else 'export PATH="$TEST_BIN:$PATH"; ')+'exec bash "$@"'
         return subprocess.run([BASH,'-c',script,'test',str(script_file).replace('\\','/'),*args,*extra],env=env,capture_output=True,text=True,encoding='utf-8',timeout=60)
     if hook:
@@ -72,8 +80,20 @@ if [[ ${TEST_DB_FAIL:-0} == 1 ]];then echo 'sensitive-db-error' >&2;exit 8;fi
         assert not (cfg/'notes/prod/secrets.env').exists(),'Managed check must not overwrite local config'
         assert run(DATABASE_URL='sqlite:///bad',DEPLOYCTL_ENV_FILE=path(snapshot/'.env.json')).returncode!=0
     result=run();assert result.returncode==0,(result.stdout,result.stderr)
+    assert '--token-file' not in (base/'cli.log').read_text(), 'Default must use existing ConfigHub authentication'
+    assert password not in result.stdout+result.stderr and 'never-export' not in result.stdout+result.stderr
     target=cfg/'notes/prod';files=['config.env','secrets.env','.notes-team.json','.database-target']
     before={n:(target/n).read_bytes() for n in files}
+    result=run(TEST_FETCH_FAIL='1')
+    assert result.returncode==9,(result.returncode,result.stdout,result.stderr)
+    assert 'ConfigHub: fixture authentication rejected' in result.stderr
+    assert all((target/n).read_bytes()==data for n,data in before.items())
+    for invalid in ['{invalid json',json.dumps({'project':'shier','environment':'prod','values':{}})]:
+        values.write_text(invalid,encoding='utf-8')
+        result=run()
+        assert result.returncode==1 and 'ConfigHub返回的配置格式或数据库字段无效' in result.stderr
+        assert invalid not in result.stderr and all((target/n).read_bytes()==data for n,data in before.items())
+    fixture()
     assert b'COOKIE_SECURE=true' in before['config.env'] and b'WEB_DIR=/app/web' in before['config.env']
     assert b'APP_ORIGIN=https://notes.shier.art\n' in before['config.env']
     assert b's%20ecret%27%24%28touch%20PWNED%29%0Anext' in before['secrets.env']
@@ -95,9 +115,13 @@ if [[ ${TEST_DB_FAIL:-0} == 1 ]];then echo 'sensitive-db-error' >&2;exit 8;fi
     fixture(secret='rotated');assert run(**({'APP_ORIGIN':'https://wrong.test'} if hook else {'DATABASE_URL':'wrong','APP_ORIGIN':'https://wrong.test'})).returncode==0
     assert b'rotated' in (target/'secrets.env').read_bytes() and b'wrong.test' not in (target/'config.env').read_bytes()
     if hook:
+        assert run(DEPLOYCTL_PARAM_CLI_BINARY='').returncode==0, 'Default must invoke confighub from PATH'
+        result=run(DEPLOYCTL_PARAM_CLI_BINARY=path(base/'absent-cli'))
+        assert result.returncode==127 and 'absent-cli' in result.stderr,(result.returncode,result.stderr)
         assert run(DEPLOYCTL_IMAGE='ghcr.io/example/fixture:latest').returncode!=0
         assert run(DEPLOYCTL_PARAM_DOMAIN='changed.example.com').returncode!=0
-        assert run(DEPLOYCTL_PARAM_TOKEN_FILE=path(base/'missing')).returncode!=0
+        result=run(DEPLOYCTL_PARAM_TOKEN_FILE=path(base/'missing'))
+        assert result.returncode==7 and 'ConfigHub: fixture token file missing' in result.stderr,(result.returncode,result.stderr)
         assert run(DEPLOYCTL_APPLICATION='other').returncode!=0
         assert run(DEPLOYCTL_PARAM_TOKEN_FILE='').returncode==0
     else:

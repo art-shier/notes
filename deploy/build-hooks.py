@@ -32,7 +32,7 @@ set -- --image "${DEPLOYCTL_IMAGE:?missing immutable image}" \
   --config-hub-env "${DEPLOYCTL_PARAM_CONFIG_HUB_ENV-prod}" \
   --database-name "${DEPLOYCTL_PARAM_DATABASE_NAME-notes}" \
   --cli-binary "${DEPLOYCTL_PARAM_CLI_BINARY-}" \
-  --token-file "${DEPLOYCTL_PARAM_TOKEN_FILE-/root/shier-prod.token}"
+  --token-file "${DEPLOYCTL_PARAM_TOKEN_FILE-}"
 '''
 
 def generated():
