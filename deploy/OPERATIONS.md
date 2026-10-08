@@ -1,5 +1,7 @@
 # Notes：deployctl 部署
 
+ctl1.7.0管理台/托管Registry接入见 [平台模式](CONTROL-PLANE.md)；本页保留原发布包与ConfigHub安装入口。
+
 application为notes，默认环境prod，主机127.0.0.1:8000，就绪接口 `/api/v1/health/ready`。默认域名为 `notes.shier.art`，新版用 `--set DOMAIN=域名` 覆盖。Go/Web使用现有Dockerfile；PostgreSQL与HTTPS代理外置。
 
 ## 新版自动配置流程（待发布）
