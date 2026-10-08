@@ -4,13 +4,13 @@ ctl1.7.0管理台/托管Registry接入见 [平台模式](CONTROL-PLANE.md)；本
 
 application为notes，默认环境prod，主机127.0.0.1:8000，就绪接口 `/api/v1/health/ready`。默认域名为 `notes.shier.art`；管理模式自定义域名在管理台设置 `APP_ORIGIN=https://域名`，`--set DOMAIN=域名` 仅在最终生效的DATABASE_URL为空、执行ConfigHub回退时生成APP_ORIGIN。Go/Web使用现有Dockerfile；PostgreSQL与HTTPS代理外置。
 
-## ConfigHub 自动配置流程（v0.3.2）
+## ConfigHub 自动配置流程（v0.3.3）
 
 首选 [ctl 平台模式](CONTROL-PLANE.md)：在管理台配置有效的秘密 DATABASE_URL，服务器登录后执行 `sudo ctl install notes --prod`，pre 会直接检查连接。以下是未提供连接时的 ConfigHub 回退流程。
 
-不用填写DATABASE_URL、用户名、密码或提前下载prepare脚本。服务器需Linux、Python>=3.10、Docker Engine、Compose>=2.30、jq、root所有且不可被普通用户写入的ConfigHub CLI；Token文件默认 `/root/shier-prod.token`，root所有、权限600。沿用已有CLI凭据时显式传 `--set TOKEN_FILE=`。
+不用填写DATABASE_URL、用户名、密码或提前下载prepare脚本。服务器需Linux、Python>=3.10、Docker Engine、Compose>=2.30、jq、ConfigHub CLI。pre直接调用ConfigHub，使用执行安装的用户已有CLI登录配置，不默认读取 `/root/shier-prod.token`，无需传 `--set TOKEN_FILE=`。如果安装通过sudo执行，ConfigHub使用sudo后的用户配置；ctl登录凭据和ConfigHub登录凭据分别由各自CLI管理。
 
-新包要求ctl>=1.6.0配置回读能力，当前使用ctl>=1.7.0；v1.5.0不支持此流程。使用 [v0.3.2 Release](https://github.com/art-shier/notes/releases/tag/v0.3.2) 提供的真实RELEASE_URL与SHA256：
+新包要求ctl>=1.6.0配置回读能力，当前使用ctl>=1.7.0；v1.5.0不支持此流程。使用 [v0.3.3 Release](https://github.com/art-shier/notes/releases/tag/v0.3.3) 提供的真实RELEASE_URL与SHA256：
 
 ```bash
 sudo deployctl install notes --env prod --release "$RELEASE_URL" --sha256 "$SHA256"
@@ -25,7 +25,7 @@ sudo deployctl install notes --env prod --release "$RELEASE_URL" --sha256 "$SHA2
 
 主机/端口优先notes_db_address/notes_db_port，回退db_address/db_port；账号优先notes_db_username/notes_db_password，回退共享字段。不会重复手工配置地址和端口。仅连接已创建的notes库，不创建数据库/账号。配置来源、域名及数据库目标固定，密码可经预检更新；读取失败、预检失败或部分写入失败保留原配置。
 
-`--set DOMAIN`会生成对应APP_ORIGIN；已有显式env-var覆盖优先，修改域名还需调整或移除旧APP_ORIGIN override。数据库URL保存在服务器600的secrets.env与受保护的运行快照，不进入默认配置、包或普通日志。Token仅供宿主机pre读取，不注入应用。
+`--set DOMAIN`会生成对应APP_ORIGIN；已有显式env-var覆盖优先，修改域名还需调整或移除旧APP_ORIGIN override。数据库URL保存在服务器600的secrets.env与受保护的运行快照，不进入默认配置、包或普通日志。可选TOKEN_FILE只作为参数传给宿主机ConfigHub CLI，Notes不提前检查认证文件，也不注入应用。ConfigHub调用失败时保留原始stderr和退出码；查看ctl提示的受保护hook日志即可看到实际错误。返回JSON或数据库字段无效会单独报字段校验错误；成功导出的配置不写入日志。
 
 post只在账户状态empty且传入ADMIN_EMAIL时生成邀请，pending/registered保持现状。邀请仅在服务器600的hook日志中，可由管理员读取 `/etc/deployctl/notes/prod/hook-logs/`；不自动回显到部署命令。
 
@@ -40,6 +40,8 @@ notes自己的 `.github/workflows/release.yml` 完成测试、双架构镜像构
 v0.2.0已发布，标准包内四文件由deployctl生成。发布提交为 `35ff869f089c11db4ba02f0b818f9641b0169d35`；随后单独发布配置工具，源提交 `a32f7574bc60d9fac3469c0a7974a83c2f4b1668`，包括默认域名修改。配置工具为Release附加资产，与标准包分开，不手改Compose。
 
 v0.3.2使用自包含pre/post hook，优先检查托管的数据库连接，未提供时自动生成，required_config为空。配置回读能力已包含在ctl1.7.0中。
+
+v0.3.3取消默认Token文件和Notes侧认证预检查，直接使用ConfigHub CLI已有登录配置，并保留调用失败的原始错误及退出码。
 
 | 产物 | 地址 / 摘要 |
 |---|---|

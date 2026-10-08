@@ -8,7 +8,7 @@ umask 077
 shiji_read_database() {
   local stage=$1 hub_project=$2 hub_env=$3 database=$4
   shift 4
-  "$@" export --project "$hub_project" --env "$hub_env" --format json > "$stage/config.json" || return 1
+  "$@" export --project "$hub_project" --env "$hub_env" --format json > "$stage/config.json" || return $?
   jq -e --arg database "$database" --arg project "$hub_project" --arg environment "$hub_env" '
     select(.project == $project and .environment == $environment) | .values as $v |
     {host: ($v.notes_db_address // $v.db_address), port: (($v.notes_db_port // $v.db_port) | tostring),
@@ -21,7 +21,10 @@ shiji_read_database() {
     select(.sslmode == "require" or .sslmode == "verify-ca" or .sslmode == "verify-full") |
     (if (.host | contains(":")) and (.host | startswith("[") | not) then "[" + .host + "]" else .host end) as $host |
     . + {uri: ("postgresql://" + (.user | @uri) + ":" + (.password | @uri) + "@" + $host + ":" + .port + "/" + .database + "?sslmode=" + .sslmode + "&connect_timeout=10")}
-  ' "$stage/config.json" > "$stage/database.json" 2>/dev/null || return 1
+  ' "$stage/config.json" > "$stage/database.json" 2>/dev/null || {
+    printf '[拾记] ConfigHub返回的配置格式或数据库字段无效，保留原配置。\n' >&2
+    return 1
+  }
   jq -c '{host, port, user, database}' "$stage/database.json" > "$stage/target"
 }
 
@@ -120,7 +123,7 @@ set -- --image "${DEPLOYCTL_IMAGE:?missing immutable image}" \
   --config-hub-env "${DEPLOYCTL_PARAM_CONFIG_HUB_ENV-prod}" \
   --database-name "${DEPLOYCTL_PARAM_DATABASE_NAME-notes}" \
   --cli-binary "${DEPLOYCTL_PARAM_CLI_BINARY-}" \
-  --token-file "${DEPLOYCTL_PARAM_TOKEN_FILE-/root/shier-prod.token}"
+  --token-file "${DEPLOYCTL_PARAM_TOKEN_FILE-}"
 
 domain=notes.shier.art image='' environment=prod config_root=/etc/deployctl
 hub_url=https://config.shier.art hub_project=shier hub_env=prod database=notes
@@ -165,12 +168,10 @@ domain=${domain,,}
 native_plain_path "$config_root";native_root_chain "$config_root"
 config_dir="$config_root/notes/$environment"
 native_plain_path "$config_dir";native_root_chain "$config_dir"
-cli=${cli:-$(command -v confighub || true)}
-native_plain_path "$cli";native_root_chain "$(dirname -- "$cli")"
-[[ -x $cli && -f $cli && $(stat -c %u -- "$cli") == 0 ]] || native_die '需要root所有的ConfigHub CLI。'
-cli_mode=$(stat -c %a -- "$cli");(( (8#$cli_mode & 022) == 0 )) || native_die 'CLI不能允许组/其他用户写入。'
+cli=${cli:-confighub}
 CLI=("$cli" --server "$hub_url")
-if [[ -n $token_file ]]; then native_plain_path "$token_file";native_private_file "$token_file";CLI+=(--token-file "$token_file");fi
+# ConfigHub owns authentication and reports any credential errors itself.
+if [[ -n $token_file ]]; then CLI+=(--token-file "$token_file");fi
 for tool in docker jq; do command -v "$tool" >/dev/null || native_die "需要$tool。";done
 mkdir -p -- "$config_dir";chmod 700 -- "$config_dir"
 for file in config.env secrets.env .notes-team.json .database-target; do
@@ -186,7 +187,7 @@ if [[ -f $config_dir/.notes-team.json ]]; then
   jq -S . "$config_dir/.notes-team.json" > "$stage/saved";jq -S . "$stage/metadata" > "$stage/proposed"
   cmp -s -- "$stage/saved" "$stage/proposed" || native_die '域名或配置来源变化，拒绝自动切换。'
 fi
-shiji_read_database "$stage" "$hub_project" "$hub_env" "$database" "${CLI[@]}" || native_die 'ConfigHub读取或字段校验失败，保留原配置。'
+shiji_read_database "$stage" "$hub_project" "$hub_env" "$database" "${CLI[@]}" || exit $?
 if [[ -f $config_dir/.database-target ]]; then cmp -s -- "$config_dir/.database-target" "$stage/target" || native_die '数据库目标变化，拒绝自动切库。';fi
 printf 'APP_ORIGIN=https://%s\nCOOKIE_SECURE=true\nLISTEN_ADDR=0.0.0.0:8000\nWEB_DIR=/app/web\nATTACHMENTS_DIR=/data/attachments\nEXPORTS_DIR=/data/exports\nNOTE_HISTORY_LIMIT=200\nEXPORT_LIMIT_BYTES=2147483648\nTZ=UTC\n' "$domain" > "$stage/config.env"
 printf 'DATABASE_URL=%s\n' "$(jq -er .uri "$stage/database.json")" > "$stage/secrets.env"

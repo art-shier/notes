@@ -48,12 +48,10 @@ domain=${domain,,}
 native_plain_path "$config_root";native_root_chain "$config_root"
 config_dir="$config_root/notes/$environment"
 native_plain_path "$config_dir";native_root_chain "$config_dir"
-cli=${cli:-$(command -v confighub || true)}
-native_plain_path "$cli";native_root_chain "$(dirname -- "$cli")"
-[[ -x $cli && -f $cli && $(stat -c %u -- "$cli") == 0 ]] || native_die '需要root所有的ConfigHub CLI。'
-cli_mode=$(stat -c %a -- "$cli");(( (8#$cli_mode & 022) == 0 )) || native_die 'CLI不能允许组/其他用户写入。'
+cli=${cli:-confighub}
 CLI=("$cli" --server "$hub_url")
-if [[ -n $token_file ]]; then native_plain_path "$token_file";native_private_file "$token_file";CLI+=(--token-file "$token_file");fi
+# ConfigHub owns authentication and reports any credential errors itself.
+if [[ -n $token_file ]]; then CLI+=(--token-file "$token_file");fi
 for tool in docker jq; do command -v "$tool" >/dev/null || native_die "需要$tool。";done
 mkdir -p -- "$config_dir";chmod 700 -- "$config_dir"
 for file in config.env secrets.env .notes-team.json .database-target; do
@@ -69,7 +67,7 @@ if [[ -f $config_dir/.notes-team.json ]]; then
   jq -S . "$config_dir/.notes-team.json" > "$stage/saved";jq -S . "$stage/metadata" > "$stage/proposed"
   cmp -s -- "$stage/saved" "$stage/proposed" || native_die '域名或配置来源变化，拒绝自动切换。'
 fi
-shiji_read_database "$stage" "$hub_project" "$hub_env" "$database" "${CLI[@]}" || native_die 'ConfigHub读取或字段校验失败，保留原配置。'
+shiji_read_database "$stage" "$hub_project" "$hub_env" "$database" "${CLI[@]}" || exit $?
 if [[ -f $config_dir/.database-target ]]; then cmp -s -- "$config_dir/.database-target" "$stage/target" || native_die '数据库目标变化，拒绝自动切库。';fi
 printf 'APP_ORIGIN=https://%s\nCOOKIE_SECURE=true\nLISTEN_ADDR=0.0.0.0:8000\nWEB_DIR=/app/web\nATTACHMENTS_DIR=/data/attachments\nEXPORTS_DIR=/data/exports\nNOTE_HISTORY_LIMIT=200\nEXPORT_LIMIT_BYTES=2147483648\nTZ=UTC\n' "$domain" > "$stage/config.env"
 printf 'DATABASE_URL=%s\n' "$(jq -er .uri "$stage/database.json")" > "$stage/secrets.env"

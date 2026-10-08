@@ -29,6 +29,6 @@ sudo ctl upgrade notes --prod
 sudo ctl status notes --prod
 ```
 
-有有效`DATABASE_URL`时pre直接使用最终快照做只读数据库检查，不要求ConfigHub CLI或Token，也不改写本地生成文件。没有连接时保留原ConfigHub生成和回读路径。ctl已经拉取受检镜像，pre/post辅助容器使用`--pull never`，不接触私有Registry凭据。数据库不存在或不可连接时阻止替换服务，生产不回退SQLite。
+有有效`DATABASE_URL`时pre直接使用最终快照做只读数据库检查，不要求ConfigHub CLI或Token，也不改写本地生成文件。没有连接时直接调用ConfigHub CLI，使用执行安装的用户已有登录配置，生成配置并由ctl回读；不默认读取额外Token文件。ConfigHub失败保留原始错误和退出码，详见ctl提示的受保护hook日志。ctl已经拉取受检镜像，pre/post辅助容器使用`--pull never`，不接触私有Registry凭据。数据库不存在或不可连接时阻止替换服务，生产不回退SQLite。
 
 管理台配置优先于CLI同名变量/参数。保存不立即重启，下一次安装/升级生效；失败恢复实际旧版本、配置和绑定。数据库/邀请副作用及图片/导出持久化保持此前边界，后续OSS接入单独实现。
