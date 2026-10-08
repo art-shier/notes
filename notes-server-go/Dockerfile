@@ -1,4 +1,4 @@
-FROM node:22-alpine AS web
+FROM --platform=$BUILDPLATFORM node:22-alpine AS web
 WORKDIR /web
 COPY notes-web/package*.json ./
 RUN npm ci
@@ -8,12 +8,14 @@ RUN npm run build
 FROM web AS web-test
 RUN npm test
 
-FROM golang:1.26-bookworm AS server
+FROM --platform=$BUILDPLATFORM golang:1.26-bookworm AS server
+ARG TARGETOS
+ARG TARGETARCH
 WORKDIR /src
 COPY notes-server-go/go.mod notes-server-go/go.sum ./
 RUN go mod download
 COPY notes-server-go/ ./
-RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /shiji ./cmd/shiji
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags='-s -w' -o /shiji ./cmd/shiji
 
 FROM server AS server-test
 RUN go test -race ./... && go vet ./...
