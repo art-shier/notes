@@ -6,13 +6,20 @@
 
 ## deployctl 标准部署
 
-notes自己的发布流水线负责测试、Docker镜像构建与标准包生成，服务器使用deployctl安装/升级。deployctl仓库现已公开，流水线读取固定审核提交的打包工具，无需配置 `PLATFORM_READ_TOKEN`。[v0.2.0标准部署包](https://github.com/art-shier/notes/releases/tag/v0.2.0)已发布，包含amd64/arm64镜像及SHA256校验。Release另提供独立配置工具小包，服务器无需clone源码；工具从ConfigHub的shier/prod生成私有raw配置并做只读数据库预检，库名默认为notes。服务器需具备GHCR镜像拉取权限，或将镜像设为Public。
+Notes [v0.3.2](https://github.com/art-shier/notes/releases/tag/v0.3.2) 提供 AMD64/ARM64 镜像与 SHA256 校验的标准部署包。自己的 GitHub 流水线完成测试和构建，将镜像推送到 `ctl.shier.art/notes`，登记 ctl 版本并推进 stable。使用 ctl>=1.7.0，在管理台注册 notes、配置 prod 的秘密 `DATABASE_URL`，服务器使用该项目/prod 的 deployer 凭据登录后安装：
+
+```bash
+sudo ctl login --server https://ctl.shier.art
+sudo ctl install notes --prod
+```
+
+已有安装使用 `sudo ctl upgrade notes --prod`。自定义宿主机端口添加 `--port 8085`；首次管理员邀请可添加 `--set ADMIN_EMAIL=you@example.com`。构建使用项目 publisher 凭据，保存到 GitHub Secret `CTL_PUBLISH_TOKEN`。端到端步骤和环境变量优先级见 [ctl 平台模式](deploy/CONTROL-PLANE.md)。
 
 图片持久化按当前决定暂缓，升级或重建可能丢失本地图片/导出，后续再接OSS。发布、配置、安装与当前验证边界见 [deployctl部署指南](deploy/OPERATIONS.md)。
 
-部署入口默认域名为 `notes.shier.art`，新版deployctl方式通过 `--set DOMAIN=域名` 覆盖。DNS需指向部署服务器；deployctl方式的HTTPS反向代理需在服务器另行配置。
+部署入口默认域名为 `notes.shier.art`，管理模式下自定义域名在 prod 配置设置 `APP_ORIGIN=https://你的域名`。DNS需指向部署服务器，HTTPS反向代理需在服务器另行配置。
 
-新版源码已移除所有安装必填配置。标准包内的pre-install自动从ConfigHub生成 `DATABASE_URL`（包含用户名和密码），采用默认 `APP_ORIGIN=https://notes.shier.art`、`COOKIE_SECURE=true`；不用clone或提前运行prepare。服务器预先安装ConfigHub CLI并准备私有Token文件即可。此流程需要待发布的ctl>=1.6.0及新的Notes包；旧v0.2.0仍需独立配置工具，不能直接使用新步骤。详见部署指南。
+标准包不要求提前填写默认配置。pre-install 优先检查 ctl 提供的 PostgreSQL `DATABASE_URL`；有有效连接时无需 ConfigHub CLI/Token。未提供连接时保留 ConfigHub 自动生成流程。镜像默认 `APP_ORIGIN=https://notes.shier.art`、`COOKIE_SECURE=true`。旧的 [v0.2.0](https://github.com/art-shier/notes/releases/tag/v0.2.0) GHCR 包与独立配置工具安装步骤保留在部署指南。
 
 ## 原生一行部署（无需 Docker）
 
