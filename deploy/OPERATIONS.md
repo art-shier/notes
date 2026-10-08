@@ -23,7 +23,7 @@
 ## 安装与升级
 
 ```bash
-sudo ctl login --server https://ctl.shier.art
+sudo ctl login
 sudo ctl install notes --prod
 sudo ctl upgrade notes --prod
 sudo ctl status notes --prod

@@ -23,7 +23,7 @@ prod环境配置完整PostgreSQL `DATABASE_URL`，或提供`DB_HOST`、`DB_USER`
 安装参数可设置`ADMIN_EMAIL`：post仅在数据库没有账户/邀请时创建管理员邀请。邀请内容保存在ctl的私有hook日志。已有账户/邀请不会重复初始化。
 
 ```bash
-sudo ctl login --server https://ctl.shier.art
+sudo ctl login
 sudo ctl install notes --prod
 sudo ctl upgrade notes --prod
 sudo ctl status notes --prod

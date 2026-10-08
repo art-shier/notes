@@ -9,7 +9,7 @@
 Notes标准发布提供 AMD64/ARM64 镜像与 SHA256 校验的标准部署包。自己的 GitHub 流水线完成测试和构建，将镜像推送到 `ctl.shier.art/notes`，登记 ctl 版本并推进 stable。使用 ctl>=1.7.0，在管理台注册notes、配置prod的DATABASE_URL或DB_HOST/DB_USER/秘密DB_PASSWORD，服务器使用该项目/prod 的 deployer 凭据登录后安装：
 
 ```bash
-sudo ctl login --server https://ctl.shier.art
+sudo ctl login
 sudo ctl install notes --prod
 ```
 
