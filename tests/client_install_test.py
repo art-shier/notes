@@ -19,6 +19,8 @@ with tempfile.TemporaryDirectory(prefix='notes-client-test-') as temporary:
     if os.name=='nt': command=['cmd.exe','/d','/c',str(launcher),'--help']
     help_result=subprocess.run(command,capture_output=True,text=True,encoding='utf-8')
     assert help_result.returncode==0 and 'search' in help_result.stdout,(help_result.stdout,help_result.stderr)
+    cached=subprocess.run([sys.executable,'-c','import agent_auth'],cwd=target/'scripts',capture_output=True)
+    assert cached.returncode==0
     assert install().returncode==0
     assert install('--bin-dir',str(target/'scripts')).returncode!=0
     spec=importlib.util.spec_from_file_location('client_installer',installer)

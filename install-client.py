@@ -95,7 +95,10 @@ def check_existing(target,launcher):
     entries=list(target.rglob('*'))
     if any(is_link(entry) for entry in entries):
         raise ValueError('Existing Skill contains symlinks or junctions; no files changed.')
-    if {entry.relative_to(target).as_posix() for entry in entries}!=expected:
+    def generated_cache(name):
+        return name=='scripts/__pycache__' or re.fullmatch(r'scripts/__pycache__/(?:notes|agent_auth)\.[A-Za-z0-9_-]+(?:\.opt-[012])?\.pyc',name)
+    actual={entry.relative_to(target).as_posix() for entry in entries}
+    if {name for name in actual if not generated_cache(name)}!=expected:
         raise ValueError('Existing Skill contains custom files; no files changed.')
     if any(digest((target/name).read_bytes())!=saved.get('files',{}).get(name) for name in previous):
         raise ValueError('Existing Skill has local changes; no files changed.')

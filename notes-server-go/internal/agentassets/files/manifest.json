@@ -3,7 +3,7 @@
   "sha256": "4a268a880c01d0b056a2aed59fe9e77b66413ed507ce6c2e573fe13346c7103b",
   "files": {
     "SKILL.md": "1b7e29a52957c867f61280e5ccb8f14a20e759cbeee9f3a9107aad35a25caa82",
-    "install-client.py": "a9bff6d1d77e2534a033d47e682868ed71d9481b7b9ffedb9da4ae4e9804100f",
+    "install-client.py": "5dc6f604553388e342c7d9f949f24283a1b749a84f7161afa714ed85c779d423",
     "references/api.md": "4026163551449bf31dbc736b42b1f345ff8a3557b859d1bbc7a51b1c56e1271b",
     "scripts/agent_auth.py": "90431e60f64300bfff21f2f71eb52e5990a1646435b6dd8f14df7f4354d0d242",
     "scripts/notes.py": "a650be88583925d2f074c1bae8eada2cb36a8b358385d6d7f19529265ad64332",
