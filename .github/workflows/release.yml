@@ -123,6 +123,9 @@ jobs:
         working-directory: source
         run: |
           python deploy/build-hooks.py --check
+          python scripts/build_agent_assets.py --check
+          python tests/agent_client_test.py
+          python tests/client_install_test.py
           python tests/team_package_test.py ../platform
           bash notes-server-go/ops/test-release.sh
       - uses: docker/setup-qemu-action@v3

@@ -121,6 +121,13 @@ type Token struct {
 
 func (Token) TableName() string { return "api_tokens" }
 
+// AgentGrant contains hashes only; the credential is generated and kept by the client.
+type AgentGrant struct {
+	ID, DeviceHash, UserCode, Name, TokenHash, TokenPrefix, Status string
+	TokenID                                                        *string
+	CreatedAt, ExpiresAt                                           Time
+}
+
 type Tag struct{ ID, UserID, Name string }
 type NoteTag struct {
 	UserID string

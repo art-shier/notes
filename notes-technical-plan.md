@@ -111,3 +111,10 @@ notes 查询支持 query、folder_id、favorite、trash；默认按 updated_at/i
 新增管理员离线备份/校验/新环境恢复CLI，数据库与全部附件以SHA256清单校验；SQLite包含尚未checkpoint的WAL，PostgreSQL使用custom dump及单事务恢复。恢复不覆盖已有库，旧网页会话和临时导出清空，账号、密码、Token、分类、标签和历史保留。Compose提供停写备份、独立项目恢复及HTTPS健康检查脚本；镜像固定PGDG16客户端，与PG16服务端匹配。
 
 实际本地用双用户隔离库经独立CLI进程备份与恢复，重新启动恢复库API/Web后验证登录、图片、历史恢复、用户隔离与原Agent Token继续读写。正式服务器连接信息尚未提供，容器/PostgreSQL/HTTPS验收未完成。详情见 [部署指南](notes-deployment-guide.md) 和 [实施与验证记录](notes-operations-phase-plan.md)。没有新增定时任务或公开注册。
+
+
+## Agent App 授权（v0.4.0）
+
+Agent 安装在线 Skill 后，通过客户端发起十分钟设备授权。CLI 在本地生成 Token，仅发送 SHA256；用户在 Notes 页面核对授权码、当前账户、权限和有效期并亲自批准。客户端轮询后验证 Bearer 身份，原子保存到当前用户的 `~/.shiji-notes/client.json`。Unix 700/600，Windows 私有 ACL。完整密钥不进入浏览器回调、聊天或模型记忆。手动 Token 和旧环境连接仍兼容。
+
+公开资源由 Go 内嵌，`/agent/SKILL.md`、完整 ZIP、安装器、脚本和参考文件与服务同版；`/api/v1/agent-access` 提供 URL 和 SHA256。构建时 `python scripts/build_agent_assets.py --check` 验证生成产物。数据库增加独立 `agent_grants` 表，保留原有迁移版本和业务数据；并发审批通过事务和状态条件更新保证只创建一次 Token。无 ConfigHub 或 ctl 依赖。

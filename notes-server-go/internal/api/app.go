@@ -12,12 +12,15 @@ import (
 	"shiji/internal/config"
 	"shiji/internal/store"
 	"strings"
+	"sync"
 )
 
 type App struct {
 	DB                       *gorm.DB
 	Settings                 config.Settings
 	ExportSlots, UploadSlots chan struct{}
+	agentRateMu              sync.Mutex
+	agentRates               map[string]agentRate
 }
 type Principal struct {
 	User    store.User
@@ -127,6 +130,7 @@ func (a *App) Router() *gin.Engine {
 	})
 	r.GET("/openapi.json", func(c *gin.Context) { c.Data(200, "application/json; charset=utf-8", openAPI) })
 	a.RegisterAuth(r)
+	a.RegisterAgentAssets(r)
 	a.RegisterAttachments(r)
 	a.RegisterNotes(r)
 	a.RegisterExports(r)

@@ -4,3 +4,5 @@
 Dockerfile text eol=lf
 *.yaml text eol=lf
 *.yml text eol=lf
+notes-server-go/internal/agentassets/files/** text eol=lf
+notes-server-go/internal/agentassets/files/*.zip binary

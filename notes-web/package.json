@@ -1,9 +1,30 @@
 {
   "name": "shiji-notes-web",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "vite --host 127.0.0.1", "test": "node --experimental-strip-types --test src/saveQueue.test.ts src/draftStore.test.ts", "build": "tsc -b && vite build", "preview": "vite preview --host 127.0.0.1" },
-  "dependencies": { "react": "^19.2.0", "react-dom": "^19.2.0", "lucide-react": "^0.468.0", "@tiptap/react": "^3.0.0", "@tiptap/starter-kit": "^3.0.0", "@tiptap/extension-image": "^3.0.0", "@tiptap/extension-placeholder": "^3.0.0" },
-  "devDependencies": { "typescript": "^5.9.3", "vite": "^7.1.0", "@vitejs/plugin-react": "^5.0.0", "@types/react": "^19.2.0", "@types/react-dom": "^19.2.0" }
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "test": "node --experimental-strip-types --test src/saveQueue.test.ts src/draftStore.test.ts src/agentConnection.test.ts",
+    "test:browser": "playwright test",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@tiptap/extension-image": "^3.0.0",
+    "@tiptap/extension-placeholder": "^3.0.0",
+    "@tiptap/react": "^3.0.0",
+    "@tiptap/starter-kit": "^3.0.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.0"
+  }
 }

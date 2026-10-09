@@ -68,7 +68,10 @@ func Check(db *gorm.DB) error {
 }
 func Migrate(db *gorm.DB) error {
 	if db.Migrator().HasTable("alembic_version") {
-		return Check(db)
+		if e := Check(db); e != nil {
+			return e
+		}
+		return migrateAgentGrants(db)
 	}
 	if db.Migrator().HasTable("users") {
 		return fmt.Errorf("refusing unknown existing schema")
@@ -81,7 +84,7 @@ func Migrate(db *gorm.DB) error {
 	if e != nil {
 		return e
 	}
-	return db.Transaction(func(tx *gorm.DB) error {
+	e = db.Transaction(func(tx *gorm.DB) error {
 		for _, s := range strings.Split(string(b), ";") {
 			if strings.TrimSpace(s) != "" {
 				if e := tx.Exec(s).Error; e != nil {
@@ -90,6 +93,28 @@ func Migrate(db *gorm.DB) error {
 			}
 		}
 		return nil
+	})
+	if e != nil {
+		return e
+	}
+	return migrateAgentGrants(db)
+}
+
+// This additive extension deliberately leaves the legacy revision and all existing data intact.
+func migrateAgentGrants(db *gorm.DB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if db.Dialector.Name() == "postgres" {
+			if e := tx.Exec("SELECT pg_advisory_xact_lock(84721094)").Error; e != nil {
+				return e
+			}
+		}
+		return tx.Exec(`CREATE TABLE IF NOT EXISTS agent_grants (
+		 id VARCHAR(36) PRIMARY KEY, device_hash VARCHAR(64) NOT NULL UNIQUE,
+		 user_code VARCHAR(9) NOT NULL UNIQUE, name VARCHAR(60) NOT NULL,
+		 token_hash VARCHAR(64) NOT NULL, token_prefix VARCHAR(10) NOT NULL,
+		 status VARCHAR(12) NOT NULL, token_id VARCHAR(36) REFERENCES api_tokens(id),
+		 created_at TIMESTAMP NOT NULL, expires_at TIMESTAMP NOT NULL
+		)`).Error
 	})
 }
 
