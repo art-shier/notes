@@ -110,7 +110,7 @@ shiji-notes folders list
 
 `login` 默认打开 `https://notes.shier.art` 的授权页面。用户核对授权码、账户、权限和有效期并亲自确认，CLI 自动保存连接到当前用户的 `~/.shiji-notes/client.json`，后续直接使用。Agent 使用 `login --no-browser`，将输出的授权链接在新标签页打开后等待用户确认，不能代替用户批准。`logout` 撤销并清理连接；原来的环境变量和手动 Token 仍兼容。该 Token 属于 Notes 账户，与 ctl 部署凭据、数据库密码不同。
 
-Notes v0.4.0 起在“空间设置 → Agent 接入”提供可完整复制给 Agent 的安装和授权说明，同时公开这些资源（需先升级 Notes 服务）：
+Notes v0.4.1 起在“空间设置 → Agent 接入”提供可完整复制给 Agent 的安装和授权说明，同时公开这些资源（需先升级 Notes 服务）：
 
 - [在线 Skill 文本](https://notes.shier.art/agent/SKILL.md)
 - [完整 Skill ZIP](https://notes.shier.art/agent/shiji-notes.zip)
