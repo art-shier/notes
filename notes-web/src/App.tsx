@@ -22,7 +22,7 @@ export function App(){
   if(!ready)return <main className="app-shell"><div className="app-content empty-state" role="status">正在打开笔记空间…</div></main>;
   if(error)return <main className="app-shell"><div className="app-content empty-state"><h2>暂时无法连接服务</h2><p>{error}</p><button className="secondary-button" onClick={()=>void identify()}>重新连接</button></div></main>;
   if(!account)return <main className="app-shell"><div className="app-content">{agentCode!==null&&<div className="inline-notice">请先登录 Notes，再核对并批准 Agent 的连接请求。</div>}<AuthPage onLogin={setAccount}/></div></main>;
-  if(agentCode!==null)return <AgentAuthorizationPage account={account} code={agentCode}/>;
+  if(agentCode!==null)return <AgentAuthorizationPage key={account.id+':'+agentCode} account={account} code={agentCode}/>;
   return <Workspace key={account.id} account={account} theme={theme} onTheme={()=>setTheme(t=>t==='light'?'dark':'light')} onLogout={()=>setAccount(null)} navigationGuard={navigationGuard}/>;
 }
 function Workspace({account,theme,onTheme,onLogout,navigationGuard}:{account:Account;theme:'light'|'dark';onTheme:()=>void;onLogout:()=>void;navigationGuard:{current:(()=>Promise<boolean>)|null}}){

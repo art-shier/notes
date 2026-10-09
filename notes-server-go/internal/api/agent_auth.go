@@ -200,13 +200,17 @@ func (a *App) agentDecision(c *gin.Context, p Principal) error {
 	}
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4096)
 	var b struct {
-		Approve bool   `json:"approve"`
-		Access  string `json:"access"`
-		Trash   bool   `json:"allow_trash"`
-		Days    int    `json:"expires_days"`
+		Approve   bool   `json:"approve"`
+		AccountID string `json:"account_id"`
+		Access    string `json:"access"`
+		Trash     bool   `json:"allow_trash"`
+		Days      int    `json:"expires_days"`
 	}
 	if e := Decode(c, &b); e != nil {
 		return e
+	}
+	if b.Approve && b.AccountID != p.User.ID {
+		return Fail(409, "account_changed", "当前登录账户已变更，请刷新页面后重新核对授权。")
 	}
 	if b.Approve && (b.Access != "read" && b.Access != "write" || b.Days < 1 || b.Days > 365 || b.Trash && b.Access != "write") {
 		return Fail(422, "validation_error", "请选择有效的权限和有效期。")

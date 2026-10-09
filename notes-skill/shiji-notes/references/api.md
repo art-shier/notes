@@ -12,7 +12,7 @@
 | POST /auth/agent/poll | device_code | `{device_code}`；返回 pending / approved / denied / expired / canceled，approved 包含 Token 元数据，无 secret |
 | POST /auth/agent/cancel | device_code | 请求有效期内取消；若已批准则撤销此次 Token |
 | GET /auth/agent/requests/{code} | Web 会话 | 获取待确认的名称、公开码、状态和到期时间 |
-| POST /auth/agent/requests/{code} | Web 会话 + Origin + CSRF | `{approve, access:"read"或"write", allow_trash, expires_days}`；只允许 pending 被处理一次；此接口仅供用户在 App 确认，Agent 不调用 |
+| POST /auth/agent/requests/{code} | Web 会话 + Origin + CSRF | `{approve, account_id, access:"read"或"write", allow_trash, expires_days}`；批准时 account_id 必须与当前会话一致，否则返回 account_changed；只允许 pending 被处理一次；此接口仅供用户在 App 确认，Agent 不调用 |
 | GET /auth/agent/me | Bearer | 当前账户和 Token 的非密钥元数据，用于 whoami 与保存前核验 |
 | POST /auth/agent/logout | Bearer | 撤销当前 Token |
 

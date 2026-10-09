@@ -2213,6 +2213,11 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 365
+          },
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Required for approval; must match the authenticated browser account."
           }
         },
         "required": [

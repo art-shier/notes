@@ -74,9 +74,13 @@ func TestAgentBrowserAuthorization(t *testing.T) {
 	if got := object(call("POST", "/api/v1/auth/agent/poll", device, "", false), 200)["status"]; got != "pending" {
 		t.Fatal(got)
 	}
-	approval := map[string]any{"approve": true, "access": "read", "allow_trash": false, "expires_days": 30}
+	approval := map[string]any{"approve": true, "account_id": u.ID, "access": "read", "allow_trash": false, "expires_days": 30}
 	if w := call("POST", "/api/v1/auth/agent/requests/"+code, approval, "browser", false); w.Code != 403 {
 		t.Fatal("approval bypassed CSRF", w.Code)
+	}
+	wrongAccount := map[string]any{"approve": true, "account_id": store.ID(), "access": "read", "expires_days": 30}
+	if w := call("POST", "/api/v1/auth/agent/requests/"+code, wrongAccount, "browser", true); w.Code != 409 {
+		t.Fatal("account mismatch accepted", w.Code)
 	}
 	object(call("POST", "/api/v1/auth/agent/requests/"+code, approval, "browser", true), 200)
 	if w := call("POST", "/api/v1/auth/agent/requests/"+code, approval, "browser", true); w.Code != 409 {
@@ -134,9 +138,9 @@ func TestAgentBrowserAuthorization(t *testing.T) {
 	raw = "sj_" + security.Secret()
 	raced := request()
 	out := make(chan int, 2)
-	for _, s := range []string{session, s2} {
-		go func(s string) {
-			b, _ := json.Marshal(approval)
+	for _, account := range []struct{ session, id string }{{session, u.ID}, {s2, u2.ID}} {
+		go func(s, id string) {
+			b, _ := json.Marshal(map[string]any{"approve": true, "account_id": id, "access": "read", "expires_days": 30})
 			req := httptest.NewRequest("POST", "/api/v1/auth/agent/requests/"+raced["user_code"].(string), bytes.NewReader(b))
 			req.Header.Set("Cookie", Cookie+"="+s)
 			req.Header.Set("Origin", a.Settings.Origin)
@@ -144,7 +148,7 @@ func TestAgentBrowserAuthorization(t *testing.T) {
 			w := httptest.NewRecorder()
 			r.ServeHTTP(w, req)
 			out <- w.Code
-		}(s)
+		}(account.session, account.id)
 	}
 	c1, c2 := <-out, <-out
 	if !(c1 == 200 && c2 == 409 || c2 == 200 && c1 == 409) {

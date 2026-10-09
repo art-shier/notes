@@ -8,7 +8,7 @@ export function AgentAuthorizationPage({account,code}:{account:Account;code:stri
  useEffect(()=>{if(code)void load();else setError('授权链接不完整，请让 Agent 重新发起连接。')},[code]);
  useEffect(()=>{if(!grant)return;const update=()=>setRemaining(Math.max(0,Math.ceil((Date.parse(grant.expires_at)-Date.now())/1000)));update();const t=setInterval(update,1000);return()=>clearInterval(t)},[grant]);
  const status=grant?.status==='pending'&&Date.parse(grant.expires_at)<=Date.now()?'expired':grant?.status;
- async function decide(approve:boolean){if(busy)return;setBusy(true);setError('');try{const result=await api.agentDecision(code,{approve,access,allow_trash:access==='write'&&trash,expires_days:Number(days)});setGrant(g=>g?{...g,status:result.status}:g)}catch(e){setError((e as Error).message);void load(false)}finally{setBusy(false)}}
+ async function decide(approve:boolean){if(busy)return;setBusy(true);setError('');try{const result=await api.agentDecision(code,{approve,account_id:account.id,access,allow_trash:access==='write'&&trash,expires_days:Number(days)});setGrant(g=>g?{...g,status:result.status}:g)}catch(e){setError((e as Error).message);void load(false)}finally{setBusy(false)}}
  const back=()=>{location.hash='';location.reload()};
  return <main className="app-shell"><section className="app-content agent-authorization"><header><button className="back-button" onClick={back} disabled={busy}><ArrowLeft size={18}/>返回 Notes</button><span className="agent-symbol"><Bot size={27}/></span><h1>授权 Agent 连接</h1><p className="header-subtitle">请核对请求，再选择允许的权限。</p></header>
   <div className="authorization-account"><span className="avatar">{account.display_name.slice(0,1)}</span><div><strong>{account.display_name}的私人空间</strong><span>{account.email}</span></div></div>

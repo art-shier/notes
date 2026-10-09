@@ -32,7 +32,7 @@ async function identify(promise:Promise<Account>){const account=await promise;cs
 export const api={
   agentAccess:()=>request<{version:string;sha256:string}>('/agent-access'),
   agentRequest:(code:string)=>request<AgentRequest>('/auth/agent/requests/'+encodeURIComponent(code)),
-  agentDecision:(code:string,body:{approve:boolean;access:string;allow_trash:boolean;expires_days:number})=>request<{status:string}>('/auth/agent/requests/'+encodeURIComponent(code),'POST',body),
+  agentDecision:(code:string,body:{approve:boolean;account_id:string;access:string;allow_trash:boolean;expires_days:number})=>request<{status:string}>('/auth/agent/requests/'+encodeURIComponent(code),'POST',body),
   search:async(query:string,folderId:string|null,view:string):Promise<Note[]>=>{const result:Note[]=[];let cursor:string|null=null;do{const params=new URLSearchParams({query,limit:'100',trash:String(view==='trash'),...(folderId?{folder_id:folderId}:{}),...(view==='favorites'?{favorite:'true'}:{}),...(cursor?{cursor}:{})});const page:{items:any[];next_cursor:string|null}=await request('/notes?'+params);result.push(...page.items.map(toNote));cursor=page.next_cursor}while(cursor);return view==='agent'?result.filter(n=>n.source==='agent'):result},
   me:()=>identify(request<Account>('/me')),
   login:(email:string,password:string)=>identify(request<Account>('/auth/login','POST',{email,password})),

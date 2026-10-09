@@ -62,7 +62,7 @@ test('Agent installs, opens Notes, waits for user approval and remembers a scope
   const second=await login(true);await page.goto(second.link);await page.getByLabel('访问权限').selectOption('write');await page.getByLabel('授权码与我的 Agent 显示的一致').check();await page.getByRole('button',{name:'允许授权'}).click();expect(await second.completion).toBe(0);
   expect(cli(['folders','create','Agent created folder']).status).toBe(0);
   expect(cli(['logout']).status).toBe(0);expect(existsSync(join(clientHome,'.shiji-notes/client.json'))).toBe(false);
-  const denied=await login();await page.goto(denied.link);await page.getByRole('button',{name:'拒绝连接'}).click();expect(await denied.completion).toBe(1);expect(denied.errors()).toContain('authorization_denied');expect(existsSync(join(clientHome,'.shiji-notes/client.json'))).toBe(false);
+  const denied=await login();await page.goto(denied.link);await expect(page.getByRole('button',{name:'允许授权'})).toBeDisabled();await expect(page.getByLabel('访问权限')).toHaveValue('read');await page.getByRole('button',{name:'拒绝连接'}).click();expect(await denied.completion).toBe(1);expect(denied.errors()).toContain('authorization_denied');expect(existsSync(join(clientHome,'.shiji-notes/client.json'))).toBe(false);
   await http.dispose();
  }finally{
   for(const child of logins)if(child.exitCode===null)child.kill();
