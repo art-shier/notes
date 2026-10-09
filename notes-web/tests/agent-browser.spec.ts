@@ -55,6 +55,8 @@ test('Agent installs, opens Notes, waits for user approval and remembers a scope
   await page.getByRole('button',{name:'返回我的笔记'}).click();await page.getByRole('button',{name:'打开空间设置'}).click();await page.getByRole('button',{name:'Agent 接入'}).click();
   await expect(page.getByRole('heading',{name:'让 Agent 连接你的笔记'})).toBeVisible();
   await expect(page.getByRole('link',{name:/阅读 Skill 文本/})).toHaveAttribute('href','/agent/SKILL.md');
+  await expect(page.getByRole('link',{name:/阅读 API 合约/})).toHaveAttribute('href','/agent/references/api.md');
+  await expect(page.getByRole('link',{name:/下载 Python 辅助包（可选）/})).toHaveAttribute('href','/agent/shiji-notes.zip');
   expect(await page.getByLabel('给 Agent 的安装与授权说明').inputValue()).toContain(origin+'/agent/SKILL.md');
   await page.screenshot({path:'test-results/agent-entry-mobile.png',fullPage:true});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

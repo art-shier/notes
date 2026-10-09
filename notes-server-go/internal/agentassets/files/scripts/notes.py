@@ -16,6 +16,7 @@ from urllib.request import Request, HTTPRedirectHandler, build_opener
 from uuid import UUID, uuid4
 
 MAX_RESPONSE = 12 * 1024**2
+USER_AGENT = 'ShijiNotes/1.0 (+https://notes.shier.art/agent/SKILL.md)'
 
 class CliError(Exception):
     def __init__(self, code, message, status=None, details=None):
@@ -57,7 +58,7 @@ class Client:
         if output is not None:
             output=Path(output)
             if output.exists():raise CliError('file_exists','Output already exists; choose a new filename.')
-        headers = {'Accept':'application/json'}
+        headers = {'Accept':'application/json','User-Agent':USER_AGENT}
         if path not in {'/auth/agent/request','/auth/agent/poll','/auth/agent/cancel'}:
             headers['Authorization']='Bearer '+self.token
         if key:
@@ -104,6 +105,9 @@ class Client:
                 try: detail = json.loads(payload).get('error',{})
                 except (ValueError,UnicodeError,AttributeError):detail = {}
                 if not isinstance(detail,dict):detail = {}
+                if error.code==403 and not detail and (error.headers.get('CF-Ray') or b'cloudflare' in payload.lower()):
+                    reason = ' (Error 1010: User-Agent/browser integrity policy)' if re.search(rb'\b1010\b',payload) else ''
+                    raise CliError('cloudflare_blocked','Cloudflare blocked this request'+reason+'. The request uses the ShijiNotes User-Agent. Check Cloudflare rules for this API; changing Notes permissions or repeating login will not resolve an edge block.',403)
                 if retryable and error.code in {429,502,503,504} and attempt<2:
                     try:delay = min(5,max(0,float(error.headers.get('Retry-After',0.25*(2**attempt)))))
                     except ValueError:delay = 0.25*(2**attempt)

@@ -1,10 +1,25 @@
 # 拾记 REST API 合约
 
-所有路径相对于 API 地址（以 `/api/v1` 结尾）。CLI 优先使用同时提供的 `NOTES_API_URL` + `NOTES_API_TOKEN`，否则自动读取 `~/.shiji-notes/client.json`。命令帮助 `python scripts/notes.py COMMAND --help`。Web 使用独立会话 Cookie 与 CSRF。
+所有路径相对于 API 地址（默认 `https://notes.shier.art/api/v1`）。Agent 可直接使用 HTTP 客户端；Python CLI 是可选辅助工具。业务请求携带 `Authorization: Bearer <本地私有 Token>`，JSON 请求用 `Content-Type: application/json`、`Accept: application/json`。使用明确的 `User-Agent: ShijiNotes/1.0 (+https://notes.shier.art/agent/SKILL.md)`，客户端默认 `Python-urllib/...` 已复现 Cloudflare 403 / Error 1010。请求头和私有响应不能输出到聊天或日志，拒绝跨源和重定向发送凭据。Web 使用独立会话 Cookie 与 CSRF。
 
 ## App 授权与本地连接
 
-`login [--server https://notes.shier.art] [--no-browser]` 发起十分钟授权请求。CLI 本地生成强随机 Token，仅发送 SHA256 和前缀；服务端不保存或向浏览器返回完整 Token。用户在 `/#agent-authorize?code=ABCD-EFGH` 核对授权码和账户，选择只读或读写、独立回收站权限、1–365天有效期。Agent 必须等待用户亲自确认。
+直接 HTTP 接入步骤：
+
+1. 在本地生成完整 Token（以下代码不打印 Token）：
+
+   ```python
+   import secrets, hashlib
+   token = 'sj_' + secrets.token_urlsafe(32)
+   request_body = {'name': '我的 Agent', 'token_hash': hashlib.sha256(token.encode()).hexdigest(), 'token_prefix': token[:10]}
+   ```
+
+2. 无 Bearer 的 `POST /auth/agent/request` 发送 request_body。私有保存响应中的 device_code；只将公开 user_code 和同源 verification_uri 提示给用户。请求有效期十分钟，服务端不保存完整 Token。
+3. 在新 App / 浏览器标签页打开授权链接。用户核对授权码和账户，选择只读或读写、独立回收站权限、1–365天有效期并亲自确认。Agent 不提交审批。
+4. 按 interval（默认2秒）无 Bearer 轮询 `POST /auth/agent/poll`，请求体 `{"device_code":"本地私有值"}`。pending 继续等待，denied/expired/canceled 停止。approved 仅返回元数据，不返回 Token 原文；使用第1步本地 Token 作为 Bearer 调用 `/auth/agent/me` 核验账户与前缀。
+5. 原子保存连接到当前用户私有 `~/.shiji-notes/client.json`，字段为 api_url、token、account（me 的 account）、token_info（me 的 token）。Unix 目录700/文件600，Windows 私有 ACL；不接受符号链接。保存失败或中断时尝试无 Bearer 的 cancel，保留原连接。
+
+Python 辅助工具的 `login [--server https://notes.shier.art] [--no-browser]` 自动完成同一协议；授权批准仍由用户完成。
 
 | 接口 | 鉴权 | 说明 |
 |---|---|---|
@@ -18,7 +33,7 @@
 
 CLI 的成功输出不含完整 Token；私有文件由当前用户持有，Unix 700/600 或 Windows 私有 ACL。拒绝、超时、写文件失败和 Ctrl+C 不覆盖旧连接，并尽力取消新请求。服务不可达时去 App 检查是否需撤销。`login --replace` 可以更换连接，旧远端 Token 仍需在 App 撤销。不能只修改服务地址继续使用其他实例的缓存密钥。
 
-服务公开提供 `/agent/SKILL.md`、`/agent/shiji-notes.zip`、`/agent/install-client.py` 和脚本/参考文档；`GET /api/v1/agent-access` 返回同版资源 URL、版本和 SHA256，不返回配置或凭据。安装器 `--server` 从最终同源地址下载并校验 ZIP，拒绝重定向和异常包成员。
+服务公开提供 `/agent/SKILL.md` 和 `/agent/references/api.md`，直接调用 API 只需这两份说明。`/agent/shiji-notes.zip`、`/agent/install-client.py` 和脚本为可选辅助工具。`GET /api/v1/agent-access` 返回同版资源 URL、版本和 SHA256，不返回配置或凭据。安装器 `--server` 从最终同源地址下载并校验 ZIP，拒绝重定向和异常包成员。CLI 优先使用同时提供的 `NOTES_API_URL` + `NOTES_API_TOKEN`，否则读取本地私有连接；命令帮助 `python scripts/notes.py COMMAND --help`。
 
 ## 接口与权限
 
@@ -109,3 +124,5 @@ ZIP含 library.json（schema_version2，folders/tags/notes）、notes/{UUID}.htm
 客户端最多3次尝试，仅 GET 和带键的笔记创建可重试；限429/502/503/504或连接故障，Retry-After 最多等待5秒。其他写入发生服务或连接错误可能结果不确定，先 GET，不自动重发。自动生成键会在成功或失败 JSON 中返回；跨进程使用同一键与原请求参数重试。
 
 服务错误格式：`{"error":{"code":"version_conflict","message":"...","details":{"current_version":4}}}`。401 检查失效/撤销凭证；403 缺权限；404 无对象或非本用户；409 版本或幂等冲突；413 超限；422 输入/正文错误。409 不能自动改 expected_version 重试，应重新读取、比较并合并。Token 不可用于管理 Token 或注册账户。
+
+Cloudflare 的 HTML 403（如 Error 1010）发生在请求到达 Notes 之前，不等于上面的 JSON 权限错误。Python 工具会以 `cloudflare_blocked` 报告此类拒绝，不自动重试403。当前默认 Python UA 在官方实例被拒绝，ShijiNotes UA 已验证可用；若仍拒绝，检查该实例的 Cloudflare UA/Browser Integrity/WAF 规则，不重复申请权限或绕过挑战。Python 辅助工具不能解决服务不可达或服务端阻止 API 访问的问题。

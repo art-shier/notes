@@ -1,5 +1,5 @@
 """Credential behavior tests, entirely within disposable directories."""
-import os, sys, tempfile, unittest, subprocess
+import importlib.util, json, os, sys, tempfile, unittest, subprocess
 from http.server import BaseHTTPRequestHandler,HTTPServer
 from threading import Thread
 from pathlib import Path
@@ -7,6 +7,60 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'notes-skill/shiji-notes/scripts'))
 import notes
+
+class HttpCompatibility(unittest.TestCase):
+    def test_installer_uses_the_same_explicit_identity_for_downloads(self):
+        spec=importlib.util.spec_from_file_location('installer',ROOT/'install-client.py')
+        installer=importlib.util.module_from_spec(spec);spec.loader.exec_module(installer)
+        spec=importlib.util.spec_from_file_location('assets',ROOT/'scripts/build_agent_assets.py')
+        assets=importlib.util.module_from_spec(spec);spec.loader.exec_module(assets)
+        resources=assets.resources();received=[]
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                received.append(self.headers.get('User-Agent'))
+                body=(json.dumps({'sha256':installer.digest(resources['shiji-notes.zip'])}).encode() if self.path=='/api/v1/agent-access' else resources['shiji-notes.zip'])
+                self.send_response(200);self.end_headers();self.wfile.write(body)
+            def log_message(self,*args):pass
+        server=HTTPServer(('127.0.0.1',0),Handler);worker=Thread(target=server.serve_forever,daemon=True);worker.start()
+        try:
+            origin=f'http://127.0.0.1:{server.server_port}'
+            installer.fetch(origin+'/download')
+            args=type('Args',(),{'server':origin,'source_dir':None})()
+            with patch.dict(os.environ,{'NOTES_ALLOW_LOCAL_HTTP':'1'}):files,_=installer.bundle(args)
+            self.assertIn('scripts/notes.py',files)
+            self.assertEqual(len(received),3)
+            self.assertTrue(all(ua.startswith('ShijiNotes/') for ua in received))
+        finally:server.shutdown();server.server_close();worker.join()
+
+    def test_explicit_client_identity_and_cloudflare_errors(self):
+        received=[]
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                received.append(self.headers.get('User-Agent'))
+                if self.path.endswith('/edge'):
+                    self.send_response(403);self.send_header('CF-Ray','fixture-ray');body=b'<html>Cloudflare Error 1010: Access denied</html>'
+                elif self.path.endswith('/denied'):
+                    self.send_response(403);body=b'{"error":{"code":"scope_denied","message":"Missing notes:read"}}'
+                elif self.headers.get('User-Agent','').startswith('Python-urllib/'):
+                    self.send_response(403);self.send_header('CF-Ray','fixture-ray');body=b'<html>Cloudflare Error 1010: Access denied</html>'
+                else:
+                    self.send_response(200);body=b'{"items":[]}'
+                self.end_headers();self.wfile.write(body)
+            def log_message(self,*args):pass
+        server=HTTPServer(('127.0.0.1',0),Handler);worker=Thread(target=server.serve_forever,daemon=True);worker.start()
+        try:
+            client=notes.Client({'NOTES_API_URL':f'http://127.0.0.1:{server.server_port}/api/v1','NOTES_API_TOKEN':'fixture','NOTES_ALLOW_LOCAL_HTTP':'1'})
+            self.assertEqual(client.request('GET','/notes'),{'items':[]})
+            self.assertTrue(received[-1].startswith('ShijiNotes/'))
+            with self.assertRaises(notes.CliError) as blocked:client.request('GET','/edge')
+            self.assertEqual(blocked.exception.code,'cloudflare_blocked')
+            self.assertIn('1010',str(blocked.exception))
+            self.assertIn('User-Agent',str(blocked.exception))
+            self.assertNotIn('<html>',str(blocked.exception))
+            with self.assertRaises(notes.CliError) as denied:client.request('GET','/denied')
+            self.assertEqual(denied.exception.code,'scope_denied')
+            self.assertEqual(received.count(received[-1]),3,'403 must not be retried')
+        finally:server.shutdown();server.server_close();worker.join()
 
 class Credentials(unittest.TestCase):
     def test_saved_profile_used_without_environment(self):
