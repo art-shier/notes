@@ -3,12 +3,17 @@ import {X,FolderPlus,AlertCircle,Check} from 'lucide-react';
 import {FolderBrowser,type View} from './FolderBrowser';
 import {Settings} from './Settings';
 import {AuthPage} from './AuthPage';
+import {AgentAuthorizationPage} from './AgentAuthorizationPage';
+import {authorizationCode} from './agentHandoff';
 import {api,ApiError,type Account,type ExportOptions} from './api';
 import {useRemoteLibrary,type Draft} from './useRemoteLibrary';
 import type {Note} from './data';
 const NoteEditor=lazy(()=>import('./NoteEditor').then(m=>({default:m.NoteEditor})));
 const HistoryPanel=lazy(()=>import('./HistoryPanel').then(m=>({default:m.HistoryPanel})));
 export function App(){
+  const [agentCode,setAgentCode]=useState(()=>authorizationCode(location.hash));
+  const navigationGuard=useRef<(()=>Promise<boolean>)|null>(null);
+  useEffect(()=>{const route=async()=>{const hash=location.hash;const code=authorizationCode(hash);if(navigationGuard.current&&!await navigationGuard.current()){history.replaceState(null,'',location.pathname+location.search);return}if(location.hash===hash)setAgentCode(code)};window.addEventListener('hashchange',route);return()=>window.removeEventListener('hashchange',route)},[]);
   const [account,setAccount]=useState<Account|null>(null);const [ready,setReady]=useState(false);const [error,setError]=useState('');
   const [theme,setTheme]=useState<'light'|'dark'>(()=>{try{return localStorage.getItem('shiji.theme')==='dark'?'dark':'light'}catch{return 'light'}});
   useEffect(()=>{document.documentElement.dataset.theme=theme;try{localStorage.setItem('shiji.theme',theme)}catch{}},[theme]);
@@ -16,14 +21,16 @@ export function App(){
   useEffect(()=>{void identify()},[]);
   if(!ready)return <main className="app-shell"><div className="app-content empty-state" role="status">正在打开笔记空间…</div></main>;
   if(error)return <main className="app-shell"><div className="app-content empty-state"><h2>暂时无法连接服务</h2><p>{error}</p><button className="secondary-button" onClick={()=>void identify()}>重新连接</button></div></main>;
-  if(!account)return <main className="app-shell"><div className="app-content"><AuthPage onLogin={setAccount}/></div></main>;
-  return <Workspace key={account.id} account={account} theme={theme} onTheme={()=>setTheme(t=>t==='light'?'dark':'light')} onLogout={()=>setAccount(null)}/>;
+  if(!account)return <main className="app-shell"><div className="app-content">{agentCode!==null&&<div className="inline-notice">请先登录 Notes，再核对并批准 Agent 的连接请求。</div>}<AuthPage onLogin={setAccount}/></div></main>;
+  if(agentCode!==null)return <AgentAuthorizationPage account={account} code={agentCode}/>;
+  return <Workspace key={account.id} account={account} theme={theme} onTheme={()=>setTheme(t=>t==='light'?'dark':'light')} onLogout={()=>setAccount(null)} navigationGuard={navigationGuard}/>;
 }
-function Workspace({account,theme,onTheme,onLogout}:{account:Account;theme:'light'|'dark';onTheme:()=>void;onLogout:()=>void}){
+function Workspace({account,theme,onTheme,onLogout,navigationGuard}:{account:Account;theme:'light'|'dark';onTheme:()=>void;onLogout:()=>void;navigationGuard:{current:(()=>Promise<boolean>)|null}}){
   const remote=useRemoteLibrary(account);const {library,setLibrary,queue,states}=remote;
   const [folderId,setFolderId]=useState<string|null>(null);const [view,setView]=useState<View>('folders');const [query,setQuery]=useState('');
   const [page,setPage]=useState<'library'|'note'|'settings'|'history'>('library');const [selected,setSelected]=useState<string|null>(null);const [editorKey,setEditorKey]=useState(0);
   const [message,setMessage]=useState('');const [folderName,setFolderName]=useState('');const [folderError,setFolderError]=useState('');const [busy,setBusy]=useState(false);const busyRef=useRef(false);
+  useEffect(()=>{navigationGuard.current=async()=>{if(!await queue.flushAll()){setMessage('有笔记尚未保存，请先处理保存提示。');return false}return true};return()=>{navigationGuard.current=null}},[queue,navigationGuard]);
   const [recovery,setRecovery]=useState<{id:string;draft:Draft}|null>(null);const modal=useRef<HTMLDialogElement>(null);
   const [search,setSearch]=useState<{key:string;notes:Note[]}|null>(null);
   const searchKey=JSON.stringify([query,folderId,view]);

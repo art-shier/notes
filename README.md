@@ -100,14 +100,23 @@ irm https://raw.githubusercontent.com/art-shier/notes/main/install-client.ps1 | 
 
 其他 Agent 可指定自己的 Skill 目录：Linux/macOS 在上述命令最后的 `bash` 后追加 `-s -- --skills-dir /你的/skills目录`；Windows下载脚本后使用 `./install-client.ps1 -SkillsDir 'C:\你的\skills目录'`。`--bin-dir` / `-BinDir` 可以自定义命令目录。已有源码也可直接运行 `python install-client.py --source-dir .`。
 
-下载时先解析仓库提交，再从同一个提交下载三个 Skill/CLI 文件。重复安装可更新本安装器管理的文件，发现本地修改或同名非本项目命令时会停止。脚本不配置连接凭据，在 Agent 运行环境中另行设置：
+下载时先解析仓库提交，再从同一个提交下载完整 Skill/CLI 文件。重复安装可更新本安装器管理的文件，发现本地修改或同名非本项目命令时会停止。安装后连接：
 
 ```text
-NOTES_API_URL=https://你的笔记域名/api/v1
-NOTES_API_TOKEN=从笔记网页创建的个人访问Token
+shiji-notes login
+shiji-notes whoami
+shiji-notes folders list
 ```
 
-该 Token 属于笔记账户，与数据库密码及ctl部署凭据 用途不同。连接验证命令：`shiji-notes folders list`。安装不会连接数据库或创建笔记账号。
+`login` 默认打开 `https://notes.shier.art` 的授权页面。用户核对授权码、账户、权限和有效期并亲自确认，CLI 自动保存连接到当前用户的 `~/.shiji-notes/client.json`，后续直接使用。Agent 使用 `login --no-browser`，将输出的授权链接在新标签页打开后等待用户确认，不能代替用户批准。`logout` 撤销并清理连接；原来的环境变量和手动 Token 仍兼容。该 Token 属于 Notes 账户，与 ctl 部署凭据、数据库密码不同。
+
+Notes v0.4.0 起在“空间设置 → Agent 接入”提供可完整复制给 Agent 的安装和授权说明，同时公开这些资源（需先升级 Notes 服务）：
+
+- [在线 Skill 文本](https://notes.shier.art/agent/SKILL.md)
+- [完整 Skill ZIP](https://notes.shier.art/agent/shiji-notes.zip)
+- [Python 安装器](https://notes.shier.art/agent/install-client.py)
+
+自部署实例将以上域名换成自己的服务地址。下载安装器后运行 `python install-client.py --server https://你的域名`，会下载同版完整包并核对 `/api/v1/agent-access` 提供的 SHA256；支持自定义 skills 目录，不覆盖本地修改。没有部署新版实例时，也可从 [GitHub Skill 文本](https://raw.githubusercontent.com/art-shier/notes/main/notes-skill/shiji-notes/SKILL.md) 阅读安装说明。安装不会连接数据库或创建笔记账号。
 
 - [Go 服务端运行说明](notes-server-go/README.md)：数据库迁移、CLI、测试、环境变量。
 - [Web 前端](notes-web/README.md)：Vite 默认5173，API默认8000。

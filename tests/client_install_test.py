@@ -13,7 +13,7 @@ with tempfile.TemporaryDirectory(prefix='notes-client-test-') as temporary:
         return subprocess.run([sys.executable,str(installer),*args,*extra],capture_output=True,text=True,encoding='utf-8',errors='replace')
     result=install();assert result.returncode==0,(result.stdout,result.stderr)
     target=skills/'shiji-notes'; launcher=bin_dir/('shiji-notes.cmd' if os.name=='nt' else 'shiji-notes')
-    for name in ('SKILL.md','scripts/notes.py','references/api.md'):
+    for name in ('SKILL.md','scripts/notes.py','scripts/agent_auth.py','references/api.md'):
         assert (target/name).read_bytes()==(ROOT/'notes-skill/shiji-notes'/name).read_bytes()
     command=[str(launcher),'--help']
     if os.name=='nt': command=['cmd.exe','/d','/c',str(launcher),'--help']
@@ -59,7 +59,7 @@ with tempfile.TemporaryDirectory(prefix='notes-client-test-') as temporary:
     options.source_dir=None
     with patch.object(module,'fetch',side_effect=download):
         _,revision=module.bundle(options)
-    assert revision==pinned and len(urls)==4 and all('/'+pinned+'/' in url for url in urls[1:])
+    assert revision==pinned and len(urls)==1+len(module.FILES) and all('/'+pinned+'/' in url for url in urls[1:])
     if os.name=='nt':
         junction=base/'junction'
         created=subprocess.run(['cmd.exe','/d','/c','mklink','/J',str(junction),str(skills)],capture_output=True)

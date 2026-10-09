@@ -31,6 +31,8 @@ jobs:
           [[ "$NATIVE_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           git show-ref --verify --quiet "refs/tags/$NATIVE_VERSION"
           [[ "$(git rev-parse HEAD)" == "$(git rev-parse "refs/tags/$NATIVE_VERSION^{commit}")" ]]
+          python3 scripts/build_agent_assets.py --check
+          python3 tests/agent_client_test.py
           go -C notes-server-go test ./...
           go -C notes-server-go vet ./...
           bash notes-server-go/ops/build-native.sh "${NATIVE_VERSION#v}" "$RUNNER_TEMP/notes-release"

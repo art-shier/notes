@@ -1,6 +1,7 @@
 import type {Folder, Note, Library, Tag} from './data';
 export interface Account {id:string;email:string;display_name:string;role:string;csrf_token:string;quota_bytes:number;used_bytes:number}
 export interface Token {id:string;name:string;prefix:string;scopes:string[];expires_at:string;revoked:boolean}
+export interface AgentRequest {user_code:string;name:string;status:string;expires_at:string}
 export interface Revision {version:number;title:string;excerpt:string;action:string;actor:'web'|'agent'|'system';saved_at:string;restored_from:number|null}
 export interface RevisionDetail extends Revision {snapshot:Note}
 export interface HistoryPage {items:Revision[];next_before_version:number|null;current_version:number;retention_limit:number}
@@ -29,6 +30,9 @@ export function toNote(r:any):Note{return {id:r.id,title:r.title,html:'',content
 const toFolder=(f:any):Folder=>({id:f.id,name:f.name,parentId:f.parent_id,isInbox:f.is_inbox});
 async function identify(promise:Promise<Account>){const account=await promise;csrfToken=account.csrf_token;return account}
 export const api={
+  agentAccess:()=>request<{version:string;sha256:string}>('/agent-access'),
+  agentRequest:(code:string)=>request<AgentRequest>('/auth/agent/requests/'+encodeURIComponent(code)),
+  agentDecision:(code:string,body:{approve:boolean;access:string;allow_trash:boolean;expires_days:number})=>request<{status:string}>('/auth/agent/requests/'+encodeURIComponent(code),'POST',body),
   search:async(query:string,folderId:string|null,view:string):Promise<Note[]>=>{const result:Note[]=[];let cursor:string|null=null;do{const params=new URLSearchParams({query,limit:'100',trash:String(view==='trash'),...(folderId?{folder_id:folderId}:{}),...(view==='favorites'?{favorite:'true'}:{}),...(cursor?{cursor}:{})});const page:{items:any[];next_cursor:string|null}=await request('/notes?'+params);result.push(...page.items.map(toNote));cursor=page.next_cursor}while(cursor);return view==='agent'?result.filter(n=>n.source==='agent'):result},
   me:()=>identify(request<Account>('/me')),
   login:(email:string,password:string)=>identify(request<Account>('/auth/login','POST',{email,password})),

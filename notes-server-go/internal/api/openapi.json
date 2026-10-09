@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "拾记 API",
-    "version": "0.4.0-go",
+    "version": "0.4.0",
     "description": "Go + Gin implementation; existing REST v1 contract. Cookie/CSRF or scoped bearer authentication."
   },
   "paths": {
@@ -1258,6 +1258,368 @@
           }
         }
       }
+    },
+    "/api/v1/auth/agent/request": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Initiate ten-minute Agent authorization; client supplies credential hash",
+        "security": [],
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "403": {
+            "description": "Scope, origin or CSRF denied"
+          },
+          "409": {
+            "description": "Already processed or expired"
+          },
+          "422": {
+            "description": "Invalid input"
+          },
+          "429": {
+            "description": "Too many authorization attempts"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRequestCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/agent/poll": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Poll using private device code; never returns a raw credential",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "403": {
+            "description": "Scope, origin or CSRF denied"
+          },
+          "409": {
+            "description": "Already processed or expired"
+          },
+          "422": {
+            "description": "Invalid input"
+          },
+          "429": {
+            "description": "Too many authorization attempts"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCode"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/agent/cancel": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Cancel a grant and revoke its newly approved credential",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "403": {
+            "description": "Scope, origin or CSRF denied"
+          },
+          "409": {
+            "description": "Already processed or expired"
+          },
+          "422": {
+            "description": "Invalid input"
+          },
+          "429": {
+            "description": "Too many authorization attempts"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCode"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/agent/requests/{code}": {
+      "get": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Browser reads a public confirmation code",
+        "security": [
+          {
+            "webSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "403": {
+            "description": "Scope, origin or CSRF denied"
+          },
+          "409": {
+            "description": "Already processed or expired"
+          },
+          "422": {
+            "description": "Invalid input"
+          },
+          "429": {
+            "description": "Too many authorization attempts"
+          }
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z2-7]{4}-[A-Z2-7]{4}$"
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Human approval only; requires same Origin and CSRF",
+        "security": [
+          {
+            "webSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "403": {
+            "description": "Scope, origin or CSRF denied"
+          },
+          "409": {
+            "description": "Already processed or expired"
+          },
+          "422": {
+            "description": "Invalid input"
+          },
+          "429": {
+            "description": "Too many authorization attempts"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentDecision"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z2-7]{4}-[A-Z2-7]{4}$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/agent/me": {
+      "get": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Bearer identity and credential metadata",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "403": {
+            "description": "Scope, origin or CSRF denied"
+          },
+          "409": {
+            "description": "Already processed or expired"
+          },
+          "422": {
+            "description": "Invalid input"
+          },
+          "429": {
+            "description": "Too many authorization attempts"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/agent/logout": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Revoke the current bearer credential",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "403": {
+            "description": "Scope, origin or CSRF denied"
+          },
+          "409": {
+            "description": "Already processed or expired"
+          },
+          "422": {
+            "description": "Invalid input"
+          },
+          "429": {
+            "description": "Too many authorization attempts"
+          }
+        }
+      }
+    },
+    "/api/v1/agent-access": {
+      "get": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Public skill version, URLs and SHA256",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "403": {
+            "description": "Scope, origin or CSRF denied"
+          },
+          "409": {
+            "description": "Already processed or expired"
+          },
+          "422": {
+            "description": "Invalid input"
+          },
+          "429": {
+            "description": "Too many authorization attempts"
+          }
+        }
+      }
+    },
+    "/agent/SKILL.md": {
+      "get": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Public online shiji-notes skill text",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "403": {
+            "description": "Scope, origin or CSRF denied"
+          },
+          "409": {
+            "description": "Already processed or expired"
+          },
+          "422": {
+            "description": "Invalid input"
+          },
+          "429": {
+            "description": "Too many authorization attempts"
+          }
+        }
+      }
+    },
+    "/agent/shiji-notes.zip": {
+      "get": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Complete shiji-notes skill package",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "403": {
+            "description": "Scope, origin or CSRF denied"
+          },
+          "409": {
+            "description": "Already processed or expired"
+          },
+          "422": {
+            "description": "Invalid input"
+          },
+          "429": {
+            "description": "Too many authorization attempts"
+          }
+        }
+      }
+    },
+    "/agent/install-client.py": {
+      "get": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Portable Python skill installer",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "403": {
+            "description": "Scope, origin or CSRF denied"
+          },
+          "409": {
+            "description": "Already processed or expired"
+          },
+          "422": {
+            "description": "Invalid input"
+          },
+          "429": {
+            "description": "Too many authorization attempts"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1792,6 +2154,82 @@
           "expected_version"
         ],
         "title": "Version"
+      },
+      "AgentRequestCreate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "token_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "token_prefix": {
+            "type": "string",
+            "pattern": "^sj_[A-Za-z0-9_-]{7}$"
+          }
+        },
+        "required": [
+          "name",
+          "token_hash",
+          "token_prefix"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceCode": {
+        "type": "object",
+        "properties": {
+          "device_code": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43
+          }
+        },
+        "required": [
+          "device_code"
+        ],
+        "additionalProperties": false
+      },
+      "AgentDecision": {
+        "type": "object",
+        "properties": {
+          "approve": {
+            "type": "boolean"
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write"
+            ]
+          },
+          "allow_trash": {
+            "type": "boolean"
+          },
+          "expires_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365
+          }
+        },
+        "required": [
+          "approve"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "webSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "shiji_session"
       }
     }
   }

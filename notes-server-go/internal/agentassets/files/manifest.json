@@ -1,0 +1,12 @@
+{
+  "version": "0.4.0",
+  "sha256": "ce28d996a7f5aaea72ac31bb956b97a901a70ccb4a56faef87be098df69321f8",
+  "files": {
+    "SKILL.md": "1b7e29a52957c867f61280e5ccb8f14a20e759cbeee9f3a9107aad35a25caa82",
+    "install-client.py": "a9bff6d1d77e2534a033d47e682868ed71d9481b7b9ffedb9da4ae4e9804100f",
+    "references/api.md": "813b2a1be2bf80348732d7fd8d60b3bc4eb1f4c3b5af4057daecf3400eaedf9c",
+    "scripts/agent_auth.py": "d9d46496f6e4cd06d5b8755370ad610b0fc6d0a74406a60571dd56d78d65d6f9",
+    "scripts/notes.py": "a650be88583925d2f074c1bae8eada2cb36a8b358385d6d7f19529265ad64332",
+    "shiji-notes.zip": "ce28d996a7f5aaea72ac31bb956b97a901a70ccb4a56faef87be098df69321f8"
+  }
+}

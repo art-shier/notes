@@ -98,6 +98,7 @@ type loginBody struct {
 }
 
 func (a *App) RegisterAuth(r *gin.Engine) {
+	a.RegisterAgentAuth(r)
 	r.POST("/api/v1/auth/register", func(c *gin.Context) {
 		if e := a.register(c); e != nil {
 			RespondError(c, e)

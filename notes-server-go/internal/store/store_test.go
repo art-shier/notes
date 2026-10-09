@@ -28,4 +28,17 @@ func TestFreshSchemaAndAtomicRollback(t *testing.T) {
 	if err = Migrate(db); err != nil {
 		t.Fatal(err)
 	}
+	// Emulate an existing deployment with the legacy revision but no grant extension.
+	if err = db.Migrator().DropTable(&AgentGrant{}); err != nil {
+		t.Fatal(err)
+	}
+	if err = Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	if !db.Migrator().HasTable(&AgentGrant{}) {
+		t.Fatal("missing additive migration")
+	}
+	if err = db.First(&got, "id = ?", u.ID).Error; err != nil || got.Email != u.Email {
+		t.Fatal("upgrade lost account", err)
+	}
 }

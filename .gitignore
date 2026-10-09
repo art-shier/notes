@@ -12,6 +12,9 @@
 **/*.sqlite-*
 **/*.dump
 **/*.zip
+!notes-server-go/internal/agentassets/files/shiji-notes.zip
+notes-web/test-results/
+notes-web/playwright-report/
 **/*.exe
 **/*.tsbuildinfo
 **/__pycache__/
