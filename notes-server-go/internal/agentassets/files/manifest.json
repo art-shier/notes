@@ -1,12 +1,12 @@
 {
   "version": "0.4.2",
-  "sha256": "ad06b1a8744d8288505030cccea1718ad9511a8a02e0471fb831a10e7c0e8989",
+  "sha256": "88878ad2d9e6b001e3b1295aaf98f96b236817d7371b0b67d5ea4d12fb958f50",
   "files": {
-    "SKILL.md": "5960556659b886fa64503157f50e197037ebb42872e530d827316e2b79915846",
+    "SKILL.md": "51417047c15ace662fcff4b6faa9d8f2ca287fe93842babc6efd3c5e46f13fbe",
     "install-client.py": "ed5c83a2d1b4dc848a89de729427fbabaf8ac6fc212635166917295ca6d59a0b",
     "references/api.md": "c6a7207ea0b2d2f8b26160c29ad76011c5b4916b16ebae5ebfdb612b31e5a92f",
     "scripts/agent_auth.py": "90431e60f64300bfff21f2f71eb52e5990a1646435b6dd8f14df7f4354d0d242",
     "scripts/notes.py": "b52a547d9376a1a9cf2b9d408390ab46efba2ca1362d6b38db4e633007a539d3",
-    "shiji-notes.zip": "ad06b1a8744d8288505030cccea1718ad9511a8a02e0471fb831a10e7c0e8989"
+    "shiji-notes.zip": "88878ad2d9e6b001e3b1295aaf98f96b236817d7371b0b67d5ea4d12fb958f50"
   }
 }
