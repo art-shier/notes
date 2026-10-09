@@ -1,5 +1,7 @@
 """Credential behavior tests, entirely within disposable directories."""
 import os, sys, tempfile, unittest, subprocess
+from http.server import BaseHTTPRequestHandler,HTTPServer
+from threading import Thread
 from pathlib import Path
 from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
@@ -26,6 +28,25 @@ class Credentials(unittest.TestCase):
     def test_explicit_environment_remains_supported(self):
         c=notes.Client({'NOTES_API_URL':'https://notes.example.test/api/v1','NOTES_API_TOKEN':'fixture'})
         self.assertEqual(c.token,'fixture')
+
+    def test_public_authorization_requests_do_not_transmit_the_raw_token(self):
+        received=[]
+        class Handler(BaseHTTPRequestHandler):
+            def reply(self):
+                self.rfile.read(int(self.headers.get('Content-Length','0')))
+                received.append((self.path,self.headers.get('Authorization')))
+                self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(b'{}')
+            do_POST=reply;do_GET=reply
+            def log_message(self,*args):pass
+        server=HTTPServer(('127.0.0.1',0),Handler);worker=Thread(target=server.serve_forever,daemon=True);worker.start()
+        try:
+            token='sj_'+'c'*43
+            client=notes.Client({'NOTES_API_URL':f'http://127.0.0.1:{server.server_port}/api/v1','NOTES_API_TOKEN':token,'NOTES_ALLOW_LOCAL_HTTP':'1'})
+            for route in ['request','poll','cancel']:client.request('POST','/auth/agent/'+route,{})
+            client.request('GET','/auth/agent/me')
+            self.assertEqual([header for _,header in received[:3]],[None,None,None])
+            self.assertEqual(received[-1][1],'Bearer '+token)
+        finally:server.shutdown();server.server_close();worker.join()
 
     def test_failed_save_or_interruption_preserves_previous_and_cancels_new_grant(self):
         from agent_auth import save_profile,load_profile,login

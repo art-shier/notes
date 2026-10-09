@@ -57,7 +57,9 @@ class Client:
         if output is not None:
             output=Path(output)
             if output.exists():raise CliError('file_exists','Output already exists; choose a new filename.')
-        headers = {'Authorization':'Bearer '+self.token, 'Accept':'application/json'}
+        headers = {'Accept':'application/json'}
+        if path not in {'/auth/agent/request','/auth/agent/poll','/auth/agent/cancel'}:
+            headers['Authorization']='Bearer '+self.token
         if key:
             if not re.fullmatch(r'[A-Za-z0-9_.:-]{8,128}',key):
                 raise CliError('invalid_key','Idempotency key needs 8–128 ASCII letters, digits or _.:-.')
