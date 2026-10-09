@@ -62,7 +62,10 @@ def credential_directory():
     if not directory.exists():
         directory.mkdir(mode=0o700)
         if os.name=='nt':
-            try:subprocess.run(['icacls',str(directory),'/inheritance:r','/grant:r','*'+windows_sid()+':(OI)(CI)F'],check=True,capture_output=True)
+            try:
+                sid=windows_sid()
+                subprocess.run(['icacls',str(directory),'/setowner','*'+sid],check=True,capture_output=True)
+                subprocess.run(['icacls',str(directory),'/inheritance:r','/grant:r','*'+sid+':(OI)(CI)F'],check=True,capture_output=True)
             except (OSError,subprocess.SubprocessError):raise ValueError('Cannot create a private Windows credential directory.')
     private(directory,True)
     return directory,file
@@ -92,6 +95,9 @@ def save_profile(value):
         except BaseException:
             temp.unlink(missing_ok=True);raise
     try:
+        if os.name=='nt':
+            try:subprocess.run(['icacls',str(temp),'/setowner','*'+windows_sid()],check=True,capture_output=True)
+            except (OSError,subprocess.SubprocessError):raise ValueError('Cannot assign the credential file to the current Windows user.')
         private(temp)
         os.replace(temp,file)
     finally:temp.unlink(missing_ok=True)
