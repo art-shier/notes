@@ -20,6 +20,7 @@ import zipfile
 FILES=('SKILL.md','scripts/notes.py','scripts/agent_auth.py','references/api.md')
 MARKER='.shiji-install.json'
 PREFIX='# Installed by art-shier/notes client installer'
+USER_AGENT='ShijiNotes/1.0 (+https://notes.shier.art/agent/SKILL.md)'
 
 def digest(data): return hashlib.sha256(data).hexdigest()
 
@@ -37,7 +38,7 @@ def plain_path(raw):
     return path
 
 def fetch(url):
-    with urlopen(Request(url,headers={'User-Agent':'shiji-notes-installer','Accept':'application/vnd.github+json'}),timeout=30) as response:
+    with urlopen(Request(url,headers={'User-Agent':USER_AGENT,'Accept':'application/vnd.github+json'}),timeout=30) as response:
         data=response.read(1024*1024+1)
     if len(data)>1024*1024: raise ValueError('Download exceeded the installation size limit.')
     return data
@@ -53,7 +54,7 @@ def bundle(args):
             def redirect_request(self,*args,**kwargs):return None
         opener=build_opener(NoRedirect())
         def download(path):
-            with opener.open(Request(server+path,headers={'User-Agent':'shiji-notes-installer'}),timeout=30) as response:data=response.read(1024*1024+1)
+            with opener.open(Request(server+path,headers={'User-Agent':USER_AGENT}),timeout=30) as response:data=response.read(1024*1024+1)
             if len(data)>1024*1024:raise ValueError('Skill download exceeds size limit.')
             return data
         metadata=json.loads(download('/api/v1/agent-access'))

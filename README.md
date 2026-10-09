@@ -80,9 +80,15 @@ bash ops/check.sh https://notes.shier.art
 
 ## 本地开发与 Agent
 
-### 一键安装笔记 CLI + Skill
+### Agent 直接调用 API
 
-安装在 Agent 所在机器，需要 Python 3.10+。CLI 不依赖 Docker、Git或第三方 Python 库。
+默认阅读 [在线 Skill](https://notes.shier.art/agent/SKILL.md) 和 [API 合约](https://notes.shier.art/agent/references/api.md)，将两份文本保存到 Agent 的 `shiji-notes/SKILL.md` 和 `references/api.md` 后，使用其 HTTP 能力直接调用 `https://notes.shier.art/api/v1`，无需安装 CLI 或下载 ZIP。授权流程是 Agent 发起请求、打开 Notes App、用户亲自确认，Agent 再核验并私有保存凭据。
+
+请求设置 `User-Agent: ShijiNotes/1.0 (+https://notes.shier.art/agent/SKILL.md)`。Python 默认的 `Python-urllib/...` 在官方实例会被 Cloudflare 拦截为403 / Error1010；辅助客户端和安装器已统一使用明确的 ShijiNotes 标识。Cloudflare HTML403 与 Notes JSON权限错误不同，若仍被拒绝应检查服务端规则，辅助工具无法替代网络连通性或绕过挑战。
+
+### 一键安装笔记 Python 辅助工具（可选）
+
+Agent 当前工具无法直接发起请求或不便处理授权、凭据保存、上传时，可安装辅助工具。安装在 Agent 所在机器，需要 Python 3.10+。CLI 不依赖 Docker、Git或第三方 Python 库。
 
 Linux/macOS：
 
@@ -113,14 +119,15 @@ shiji-notes folders list
 Notes v0.4.1 起在“空间设置 → Agent 接入”提供可完整复制给 Agent 的安装和授权说明，同时公开这些资源（需先升级 Notes 服务）：
 
 - [在线 Skill 文本](https://notes.shier.art/agent/SKILL.md)
-- [完整 Skill ZIP](https://notes.shier.art/agent/shiji-notes.zip)
-- [Python 安装器](https://notes.shier.art/agent/install-client.py)
+- [API 合约](https://notes.shier.art/agent/references/api.md)
+- [Python 辅助 ZIP（可选）](https://notes.shier.art/agent/shiji-notes.zip)
+- [Python 安装器（可选）](https://notes.shier.art/agent/install-client.py)
 
 自部署实例将以上域名换成自己的服务地址。下载安装器后运行 `python install-client.py --server https://你的域名`，会下载同版完整包并核对 `/api/v1/agent-access` 提供的 SHA256；支持自定义 skills 目录，不覆盖本地修改。没有部署新版实例时，也可从 [GitHub Skill 文本](https://raw.githubusercontent.com/art-shier/notes/main/notes-skill/shiji-notes/SKILL.md) 阅读安装说明。安装不会连接数据库或创建笔记账号。
 
 - [Go 服务端运行说明](notes-server-go/README.md)：数据库迁移、CLI、测试、环境变量。
 - [Web 前端](notes-web/README.md)：Vite 默认5173，API默认8000。
-- [Agent Skill](notes-skill/shiji-notes/SKILL.md)：Python标准库客户端，服务端运行不依赖 Python。
+- [Agent Skill](notes-skill/shiji-notes/SKILL.md)：直接 REST API 接入与可选 Python 标准库客户端，服务端运行不依赖 Python。
 - [技术方案](notes-technical-plan.md)与[Go迁移记录](notes-go-migration-plan.md)。
 
 一键脚本有模拟命令回归；[CI](https://github.com/art-shier/notes/actions) 验证 Go 测试/竞态/vet、Web 测试/构建、安装脚本，以及真实 systemd 原生 Go/Web、TLS PostgreSQL16、Docker API 和完整备份恢复。[首轮验证已通过](https://github.com/art-shier/notes/actions/runs/37112169790)。域名证书、服务器环境和生产容量仍需在目标服务器验收；HTTPS 校验不会跳过 TLS 证书检查。
